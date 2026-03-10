@@ -1,0 +1,109 @@
+{
+  "projectType": "infrastructure",
+  "projectName": "SonarQube Community Branch Plugin",
+  "projectDescription": "A plugin that enables branch analysis and pull request decoration in SonarQube Community Edition",
+  "theme": "aspen",
+  "primaryColor": "#2c0444",
+  "lightColor": "#f13155",
+  "darkColor": "#d5cbdf",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "compatibility",
+              "features"
+            ]
+          },
+          {
+            "group": "Installation",
+            "pages": [
+              "installation/overview",
+              "installation/manual",
+              "installation/docker",
+              "installation/docker-compose",
+              "installation/kubernetes"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/global-settings",
+              "configuration/branch-analysis",
+              "configuration/pull-request-decoration",
+              "configuration/alm-integrations"
+            ]
+          },
+          {
+            "group": "ALM Integration",
+            "pages": [
+              "alm/github",
+              "alm/gitlab",
+              "alm/azure-devops",
+              "alm/bitbucket"
+            ]
+          },
+          {
+            "group": "CI/CD Integration",
+            "pages": [
+              "ci-cd/overview",
+              "ci-cd/github-actions",
+              "ci-cd/gitlab-ci",
+              "ci-cd/azure-pipelines",
+              "ci-cd/jenkins",
+              "ci-cd/bitbucket-pipelines",
+              "ci-cd/cirrus-ci"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/debugging",
+              "troubleshooting/faq"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/building",
+              "development/architecture",
+              "development/contributing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Branch analysis in Community Edition",
+    "Pull request decoration with quality gate status",
+    "Multi-ALM support (GitHub, GitLab, Azure DevOps, Bitbucket)",
+    "CI/CD auto-configuration for popular platforms",
+    "Docker and Kubernetes deployment options",
+    "Inline code comments on pull requests",
+    "Customizable branch retention policies"
+  ],
+  "publicApiSurface": [
+    "CommunityBranchPlugin",
+    "CommunityBranchAgent",
+    "sonar.branch.name",
+    "sonar.pullrequest.key",
+    "sonar.pullrequest.branch",
+    "sonar.pullrequest.base",
+    "sonar.scm.revision",
+    "com.github.mc1arke.sonarqube.plugin.branch.image-url-base",
+    "sonar.core.serverBaseURL",
+    "GithubActionsAutoConfigurer",
+    "GitlabCiAutoConfigurer",
+    "AzureDevopsAutoConfigurer",
+    "JenkinsAutoConfigurer",
+    "BitbucketPipelinesAutoConfigurer",
+    "PullRequestPostAnalysisTask",
+    "PullRequestBuildStatusDecorator"
+  ]
+}
