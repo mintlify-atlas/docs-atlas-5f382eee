@@ -1,0 +1,370 @@
+---
+title: FAQ
+description: Frequently asked questions about the SonarQube Community Branch Plugin
+---
+
+Frequently asked questions about installing, configuring, and using the SonarQube Community Branch Plugin.
+
+## General Questions
+
+<Accordion title="What is the SonarQube Community Branch Plugin?">
+  The SonarQube Community Branch Plugin adds branch analysis and pull request decoration features to SonarQube Community Edition. These features are normally only available in the commercial editions (Developer, Enterprise, and Data Center).
+
+  The plugin enables you to:
+  - Analyze multiple branches of your project
+  - Analyze pull requests
+  - Decorate pull requests with quality gate status and issues
+  - View branch and PR analysis results in the SonarQube UI
+</Accordion>
+
+<Accordion title="Is this plugin officially supported by SonarSource?">
+  <Warning>
+  **No.** This plugin is not maintained or supported by SonarSource.
+  </Warning>
+
+  Support is only available through:
+  - [GitHub Issues](https://github.com/mc1arke/sonarqube-community-branch-plugin/issues)
+  - Stack Overflow
+  - Community forums (not official SonarSource forums)
+
+  Do **not** contact SonarSource support or the Sonar Community forum for help with this plugin, as your request will likely be closed or ignored.
+
+  See [Support Limitations](/introduction#support-and-limitations) for more information.
+</Accordion>
+
+<Accordion title="Can I migrate from Community Edition to a Commercial Edition after using this plugin?">
+  <Warning>
+  Migrating to a commercial edition after using this plugin may result in data loss.
+  </Warning>
+
+  The compatibility between this plugin and official SonarQube branch features is **untested**. If you plan to migrate to a commercial edition:
+  - Be prepared for potential data loss
+  - Back up your data before migrating
+  - Test the migration in a non-production environment first
+  - Consider starting fresh with the commercial edition
+
+  There is **no official upgrade path** from Community Edition with this plugin to any commercial edition.
+</Accordion>
+
+<Accordion title="Which SonarQube versions are supported?">
+  The plugin version must match your SonarQube version:
+
+  - Plugin major and minor versions match SonarQube versions
+  - Example: Plugin `25.4.0` works with SonarQube `25.4.x`
+  - Patch version differences are acceptable: Plugin `25.4.0` works with SonarQube `25.4.1`
+  - Major/minor mismatches are **not supported**: Plugin `25.4.0` will **not** work with SonarQube `25.3.0` or `26.0.0`
+
+  Always use the plugin version that matches your SonarQube version. Download the correct version from the [GitHub Releases](https://github.com/mc1arke/sonarqube-community-branch-plugin/releases) page.
+</Accordion>
+
+<Accordion title="Why is this plugin needed? Why doesn't SonarQube Community Edition support branches?">
+  SonarSource restricts branch analysis and pull request decoration to commercial editions as part of their business model. This plugin uses Java bytecode instrumentation to enable these features in Community Edition.
+
+  Note that this approach:
+  - Modifies SonarQube's internal behavior
+  - May break with SonarQube updates
+  - Is not officially supported or endorsed by SonarSource
+</Accordion>
+
+## Installation Questions
+
+<Accordion title="Do I need to install both the JAR file and the webapp.zip?">
+  **Yes.** The plugin requires **both** components:
+
+  1. **Plugin JAR**: Provides backend functionality and must be installed in `extensions/plugins/`
+  2. **Web assets** (`sonarqube-webapp.zip`): Provides UI components for viewing branches and PRs
+
+  Without the web assets, the plugin will function on the backend but branches/PRs won't appear in the UI.
+
+  See [Installation Guide](/getting-started/installation) for detailed instructions.
+</Accordion>
+
+<Accordion title="Why do I need to configure javaagent for both web and CE?">
+  The plugin uses Java agent instrumentation to modify SonarQube's behavior at runtime. It needs access to both:
+
+  - **Web server** (`javaagent=web`): Handles UI, API endpoints, and web-based features
+  - **Compute Engine** (`javaagent=ce`): Processes analysis results and decorates pull requests
+
+  Both agents are required for full functionality. Missing either will cause features to fail.
+</Accordion>
+
+<Accordion title="Can I install this plugin alongside other SonarQube plugins?">
+  Yes, the Community Branch Plugin can coexist with other plugins. However:
+
+  - Ensure all plugins are compatible with your SonarQube version
+  - Some plugins may conflict if they also modify internal SonarQube classes
+  - Test your plugin combination in a non-production environment first
+</Accordion>
+
+<Accordion title="How do I upgrade the plugin?">
+  To upgrade the plugin:
+
+  1. Stop SonarQube
+  2. Remove the old plugin JAR from `extensions/plugins/`
+  3. Download the new plugin version matching your SonarQube version
+  4. Copy the new plugin JAR to `extensions/plugins/`
+  5. Update the javaagent paths in `conf/sonar.properties` with the new version number
+  6. Replace the `web` directory contents with the new `sonarqube-webapp.zip`
+  7. Start SonarQube
+
+  Always match the plugin version to your SonarQube version.
+</Accordion>
+
+<Accordion title="Does this work with SonarQube Data Center Edition?">
+  No. This plugin is designed for SonarQube Community Edition only. The commercial editions (Developer, Enterprise, Data Center) already include branch and PR analysis features natively.
+</Accordion>
+
+## Configuration Questions
+
+<Accordion title="How do I analyze branches?">
+  To analyze a branch, use the `sonar.branch.name` parameter:
+
+  ```bash
+  sonar-scanner -Dsonar.branch.name=feature/my-feature
+  ```
+
+  For CI systems with auto-configuration support (GitHub Actions, GitLab CI, etc.), the plugin can detect branch information automatically without explicit parameters.
+
+  See [Branch Analysis Configuration](/configuration/branch-analysis) for more details.
+</Accordion>
+
+<Accordion title="How do I analyze pull requests?">
+  To analyze a pull request, use these parameters:
+
+  ```bash
+  sonar-scanner \
+    -Dsonar.pullrequest.key=123 \
+    -Dsonar.pullrequest.branch=feature-branch \
+    -Dsonar.pullrequest.base=main
+  ```
+
+  **Important:**
+  - Do **not** use `sonar.branch.name` with pull request parameters
+  - Analyze the target branch first before analyzing PRs
+  - For GitHub PRs, also set `sonar.scm.revision`
+
+  See [Pull Request Analysis Configuration](/configuration/pull-request-analysis) for detailed instructions.
+</Accordion>
+
+<Accordion title="What ALM platforms are supported for PR decoration?">
+  The plugin supports pull request decoration for:
+
+  - **GitHub** (cloud and server)
+  - **GitLab** (cloud and self-hosted)
+  - **Bitbucket** (cloud and server/data center)
+  - **Azure DevOps** (cloud and server)
+
+  Each platform requires specific configuration in SonarQube. See [Pull Request Decoration](/configuration/pull-request-decoration) for setup instructions.
+</Accordion>
+
+<Accordion title="Do I need to analyze the main branch before analyzing PRs?">
+  <Warning>
+  **Yes.** You must analyze the target branch before analyzing pull requests against it.
+  </Warning>
+
+  Pull request analysis compares the PR branch against the target branch (usually `main` or `master`). If the target branch hasn't been analyzed, the comparison will fail.
+
+  Workflow:
+  1. First: Analyze main branch: `sonar-scanner -Dsonar.branch.name=main`
+  2. Then: Analyze PR: `sonar-scanner -Dsonar.pullrequest.key=123 ...`
+</Accordion>
+
+<Accordion title="Why aren't my pull requests being decorated?">
+  Common causes:
+
+  1. **Missing ALM configuration**: Configure ALM integration in Administration > Configuration
+  2. **Missing project binding**: Bind your project to the ALM in Project Settings
+  3. **Target branch not analyzed**: Analyze the target branch first
+  4. **Using both branch and PR parameters**: Don't use `sonar.branch.name` with PR parameters
+  5. **Missing Git commit**: Ensure code is committed before analysis
+  6. **Invalid credentials**: Verify ALM token/credentials have correct permissions
+
+  See [Common Issues](/troubleshooting/common-issues#pull-request-decoration-not-working) for detailed troubleshooting.
+</Accordion>
+
+<Accordion title="How do I configure the server base URL?">
+  The server base URL is required for pull request decoration links to work correctly.
+
+  Configure it at:
+  1. Log in as administrator
+  2. Go to Administration > Configuration > General Settings
+  3. Find "Server base URL" under General > General
+  4. Set it to your SonarQube URL (e.g., `https://sonarqube.example.com`)
+
+  This URL must be accessible from your ALM platform (GitHub, GitLab, etc.).
+</Accordion>
+
+## Usage Questions
+
+<Accordion title="Can I use this plugin with SonarCloud?">
+  No. SonarCloud is a separate service from SonarQube and already includes branch and PR analysis features. This plugin only works with self-hosted SonarQube Community Edition.
+</Accordion>
+
+<Accordion title="Does this plugin support monorepos?">
+  Yes. The plugin includes MonoRepoFeature support for analyzing multiple projects within a single repository.
+
+  Configure monorepo support through SonarQube project settings.
+</Accordion>
+
+<Accordion title="How long are inactive branches and PRs kept?">
+  By default:
+  - Branches and PRs are automatically deleted after **30 days** of inactivity
+  - Certain branches can be protected from deletion (e.g., `main`, `master`, `develop`)
+
+  Configure this at Administration > Configuration > General Settings > Housekeeping:
+  - "Number of days before purging inactive branches and pull requests"
+  - "Branches to keep when inactive" (regex patterns)
+</Accordion>
+
+<Accordion title="Can I manually trigger PR decoration after an analysis?">
+  No. PR decoration happens automatically during the analysis processing phase in the Compute Engine. If decoration fails, you need to:
+
+  1. Fix the underlying issue (ALM config, credentials, etc.)
+  2. Re-run the analysis
+
+  The Compute Engine processes the analysis and attempts decoration as part of the post-analysis task.
+</Accordion>
+
+<Accordion title="How do I hide images in PR comments if my SonarQube server is behind a firewall?">
+  If your ALM platform cannot access your SonarQube server, configure an external image URL:
+
+  1. Go to Administration > Configuration > General Settings > Pull Request
+  2. Set "Images base URL" to:
+     ```
+     https://raw.githubusercontent.com/mc1arke/sonarqube-community-branch-plugin/master/src/main/resources/static
+     ```
+
+  Or host the images yourself and provide that URL.
+</Accordion>
+
+## Troubleshooting Questions
+
+<Accordion title="Where can I find the logs?">
+  Key log files in `$SONARQUBE_HOME/logs/`:
+
+  - `sonar.log` - Main application log
+  - `web.log` - Web server log (check for plugin loading messages)
+  - `ce.log` - Compute Engine log (check for PR decoration activity)
+  - `es.log` - Elasticsearch log
+
+  For Docker:
+  ```bash
+  docker logs <container_name>
+  docker exec <container_name> tail -f /opt/sonarqube/logs/ce.log
+  ```
+
+  See [Debugging Guide](/troubleshooting/debugging) for more details.
+</Accordion>
+
+<Accordion title="How do I enable debug logging?">
+  Add to `conf/sonar.properties`:
+
+  ```properties
+  sonar.log.level.web.com.github.mc1arke.sonarqube.plugin=DEBUG
+  sonar.log.level.ce.com.github.mc1arke.sonarqube.plugin=DEBUG
+  ```
+
+  Then restart SonarQube.
+
+  For scanner debug output:
+  ```bash
+  sonar-scanner -X -Dsonar.verbose=true
+  ```
+
+  See [Debugging Guide](/troubleshooting/debugging#enable-debug-logging) for more options.
+</Accordion>
+
+<Accordion title="The plugin was working but stopped after a SonarQube upgrade. What happened?">
+  The plugin version must match your SonarQube version. After upgrading SonarQube:
+
+  1. Check your new SonarQube version
+  2. Download the matching plugin version from [GitHub Releases](https://github.com/mc1arke/sonarqube-community-branch-plugin/releases)
+  3. Replace the old plugin JAR
+  4. Update the javaagent paths in `sonar.properties` with the new version number
+  5. Replace the web assets
+  6. Restart SonarQube
+
+  See [Version Mismatches](/troubleshooting/common-issues#version-mismatches) for more information.
+</Accordion>
+
+<Accordion title="I see 'Loading agent' in the logs but branches still don't work. What's wrong?">
+  If the agent loads but features don't work:
+
+  1. **Check class transformation**: Look for "Transforming class" messages in debug logs
+  2. **Verify web assets**: Ensure `sonarqube-webapp.zip` is extracted to the `web` directory
+  3. **Clear browser cache**: Hard refresh your browser (Ctrl+Shift+R)
+  4. **Check both agents**: Verify both `web` and `ce` agents are loaded
+
+  See [Debugging Guide](/troubleshooting/debugging#diagnose-java-agent-issues) for detailed diagnostics.
+</Accordion>
+
+<Accordion title="Where can I get help if my issue isn't listed here?">
+  <Warning>
+  Do **not** contact SonarSource support or the official Sonar Community forum.
+  </Warning>
+
+  For help:
+
+  1. **Read the documentation**: Check the [Troubleshooting Guide](/troubleshooting/common-issues) and [Debugging Guide](/troubleshooting/debugging)
+  2. **Search GitHub Issues**: Look for similar problems in [existing issues](https://github.com/mc1arke/sonarqube-community-branch-plugin/issues)
+  3. **Stack Overflow**: Search for the `sonarqube-community-branch-plugin` tag
+  4. **Create a GitHub issue**: If you've found a bug, [open a new issue](https://github.com/mc1arke/sonarqube-community-branch-plugin/issues/new) with:
+     - SonarQube version
+     - Plugin version
+     - Detailed steps to reproduce
+     - Relevant log excerpts (sanitized)
+     - Expected vs actual behavior
+
+  See [Support Limitations](/introduction#support-and-limitations) for more information.
+</Accordion>
+
+## Docker and Kubernetes Questions
+
+<Accordion title="How do I use this plugin with Docker?">
+  Use the pre-built Docker image:
+
+  ```bash
+  docker run -d \
+    --name sonarqube \
+    -p 9000:9000 \
+    mc1arke/sonarqube-with-community-branch-plugin:25.4-community
+  ```
+
+  The image version matches the upstream SonarQube version.
+
+  **Important:** If you override `SONAR_WEB_JAVAADDITIONALOPTS` or `SONAR_CE_JAVAADDITIONALOPTS`, you must include the javaagent configuration in your overrides.
+
+  See [Docker Installation](/getting-started/installation#docker) for more details.
+</Accordion>
+
+<Accordion title="How do I use this plugin with Kubernetes and Helm?">
+  The plugin can be installed using the official SonarQube Helm chart with custom values:
+
+  ```yaml
+  plugins:
+    install:
+      - https://github.com/mc1arke/sonarqube-community-branch-plugin/releases/download/25.4.0/sonarqube-community-branch-plugin-25.4.0.jar
+  
+  sonarProperties:
+    sonar.web.javaAdditionalOpts: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-25.4.0.jar=web"
+    sonar.ce.javaAdditionalOpts: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-25.4.0.jar=ce"
+  ```
+
+  You also need an init container to install the web assets.
+
+  See [Kubernetes Installation](/getting-started/installation#kubernetes) for the complete configuration.
+</Accordion>
+
+<Accordion title="Why is my Docker container failing to start?">
+  Common causes:
+
+  1. **Incorrect javaagent path**: The path in Docker may differ from manual installations (e.g., `/opt/sonarqube/extensions/plugins/`)
+  2. **Version mismatch**: Ensure the Docker image base version matches the plugin version
+  3. **Environment variable override**: If you set `SONAR_WEB_JAVAADDITIONALOPTS`, include the javaagent configuration
+  4. **Resource constraints**: Ensure adequate memory (at least 2GB recommended)
+
+  Check container logs:
+  ```bash
+  docker logs <container_name>
+  ```
+</Accordion>

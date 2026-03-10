@@ -1,0 +1,118 @@
+---
+title: ALM Integrations
+description: Configure integrations with GitHub, GitLab, Bitbucket, and Azure DevOps
+---
+
+## Overview
+
+The Community Branch Plugin supports pull request decoration across multiple Application Lifecycle Management (ALM) platforms. Configure these integrations to enable automatic posting of SonarQube analysis results to your pull requests.
+
+## Supported ALM Platforms
+
+The plugin provides native support for the following platforms:
+
+- **GitHub** (GitHub.com and GitHub Enterprise Server)
+- **GitLab** (GitLab.com and self-hosted GitLab)
+- **Bitbucket** (Bitbucket Server/Data Center and Bitbucket Cloud)
+- **Azure DevOps** (Azure DevOps Services and Server)
+
+## Configuration Overview
+
+Each ALM platform requires specific configuration in SonarQube to enable pull request decoration:
+
+1. **Server-level configuration**: Set up the ALM platform connection in SonarQube administration settings
+2. **Project-level binding**: Link your SonarQube project to a repository in your ALM platform
+3. **Analysis parameters**: Configure scanner parameters for pull request analysis
+
+## Configuring ALM Bindings
+
+ALM bindings are configured in SonarQube through the administration interface or via Web API.
+
+### Available Actions
+
+The plugin provides Web API actions for managing ALM bindings:
+
+- `SetGithubBindingAction` - Configure GitHub integration
+- `SetGitlabBindingAction` - Configure GitLab integration
+- `SetBitbucketBindingAction` - Configure Bitbucket Server/Data Center integration
+- `SetBitbucketCloudBindingAction` - Configure Bitbucket Cloud integration
+- `SetAzureBindingAction` - Configure Azure DevOps integration
+- `DeleteBindingAction` - Remove an ALM binding
+- `ValidateBindingAction` - Validate an ALM binding configuration
+
+### Validation
+
+Each ALM platform has a dedicated validator to ensure proper configuration:
+
+- `GithubValidator` - Validates GitHub connections and credentials
+- `GitlabValidator` - Validates GitLab connections and credentials
+- `BitbucketValidator` - Validates Bitbucket connections and credentials
+- `AzureDevopsValidator` - Validates Azure DevOps connections and credentials
+
+## Auto-Configuration for CI/CD
+
+The plugin includes auto-configuration support for popular CI/CD platforms, automatically detecting branch and pull request information:
+
+### Supported CI/CD Platforms
+
+<CardGroup cols={2}>
+  <Card title="GitHub Actions" icon="github">
+    Automatic detection via `GithubActionsAutoConfigurer`
+  </Card>
+  <Card title="GitLab CI" icon="gitlab">
+    Automatic detection via `GitlabCiAutoConfigurer`
+  </Card>
+  <Card title="Azure DevOps" icon="microsoft">
+    Automatic detection via `AzureDevopsAutoConfigurer`
+  </Card>
+  <Card title="Bitbucket Pipelines" icon="bitbucket">
+    Automatic detection via `BitbucketPipelinesAutoConfigurer`
+  </Card>
+  <Card title="Jenkins" icon="jenkins">
+    Automatic detection via `JenkinsAutoConfigurer`
+  </Card>
+  <Card title="Cirrus CI">
+    Automatic detection via `CirrusCiAutoConfigurer`
+  </Card>
+  <Card title="CodeMagic">
+    Automatic detection via `CodeMagicAutoConfigurer`
+  </Card>
+</CardGroup>
+
+When using these CI/CD platforms, you typically don't need to manually specify `sonar.branch.name` or `sonar.pullrequest.*` parameters—the plugin detects them automatically from environment variables.
+
+## Image Serving for PR Decoration
+
+By default, images for pull request decoration are served as static resources from the SonarQube server.
+
+<Warning>
+  If your SonarQube server is behind a firewall and your ALM platform cannot access it, you must configure an external image base URL. See [Global Settings](/configuration/global-settings#image-base-url) for configuration details.
+</Warning>
+
+## Client Factories
+
+The plugin uses dedicated HTTP client factories for each ALM platform:
+
+- `GithubClientFactory` - Creates authenticated GitHub API clients
+- `DefaultGitlabClientFactory` - Creates authenticated GitLab API clients
+- `DefaultBitbucketClientFactory` - Creates authenticated Bitbucket API clients
+- `DefaultAzureDevopsClientFactory` - Creates authenticated Azure DevOps API clients
+
+These factories handle authentication, rate limiting, and API communication with each platform.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Global Settings" icon="gear" href="/configuration/global-settings">
+    Configure essential server settings
+  </Card>
+  <Card title="Pull Request Decoration" icon="code-pull-request" href="/configuration/pull-request-decoration">
+    Set up PR decoration parameters
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [Official SonarQube Pull Request Analysis](https://docs.sonarqube.org/latest/analysis/pull-request/)
+- [Official SonarQube Branch Analysis](https://docs.sonarsource.com/sonarqube-server/latest/analyzing-source-code/branch-analysis/introduction/)
+- [Plugin GitHub Repository](https://github.com/mc1arke/sonarqube-community-branch-plugin)

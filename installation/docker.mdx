@@ -1,0 +1,175 @@
+---
+title: Docker Installation
+description: Use the pre-built Docker image with the plugin already configured
+---
+
+The easiest way to get started with the SonarQube Community Branch Plugin is using the pre-built Docker image.
+
+## Docker Image
+
+The plugin is distributed in the [mc1arke/sonarqube-with-community-branch-plugin](https://hub.docker.com/r/mc1arke/sonarqube-with-community-branch-plugin) Docker image.
+
+<Note>
+  The image versions match the upstream SonarQube image versions. For example, to use SonarQube 25.4, use the `25.4` tag of the community branch plugin image.
+</Note>
+
+## Quick Start
+
+Run SonarQube with the Community Branch Plugin:
+
+```bash
+docker run -d \
+  --name sonarqube \
+  -p 9000:9000 \
+  mc1arke/sonarqube-with-community-branch-plugin:25.4
+```
+
+Access SonarQube at `http://localhost:9000` with default credentials:
+- Username: `admin`
+- Password: `admin`
+
+## Using with Persistent Storage
+
+For production use, mount volumes to persist data:
+
+```bash
+docker run -d \
+  --name sonarqube \
+  -p 9000:9000 \
+  -v sonarqube_data:/opt/sonarqube/data \
+  -v sonarqube_logs:/opt/sonarqube/logs \
+  -v sonarqube_extensions:/opt/sonarqube/extensions \
+  mc1arke/sonarqube-with-community-branch-plugin:25.4
+```
+
+## Using with External Database
+
+Connect to an external PostgreSQL database:
+
+```bash
+docker run -d \
+  --name sonarqube \
+  -p 9000:9000 \
+  -e SONAR_JDBC_URL=jdbc:postgresql://postgres:5432/sonar \
+  -e SONAR_JDBC_USERNAME=sonar \
+  -e SONAR_JDBC_PASSWORD=sonar \
+  -v sonarqube_data:/opt/sonarqube/data \
+  -v sonarqube_logs:/opt/sonarqube/logs \
+  -v sonarqube_extensions:/opt/sonarqube/extensions \
+  mc1arke/sonarqube-with-community-branch-plugin:25.4
+```
+
+## Environment Variables
+
+<Warning>
+  If you're setting `SONAR_WEB_JAVAADDITIONALOPTS` or `SONAR_CE_JAVAADDITIONALOPTS` environment variables in your container launch, you'll need to add the `javaagent` configuration to your overrides to match what's in the provided Dockerfile.
+</Warning>
+
+The Docker image has the following environment variables pre-configured:
+
+```bash
+SONAR_WEB_JAVAADDITIONALOPTS="-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-${PLUGIN_VERSION}.jar=web"
+SONAR_CE_JAVAADDITIONALOPTS="-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-${PLUGIN_VERSION}.jar=ce"
+```
+
+### Custom Java Options Example
+
+If you need to add additional Java options while preserving the plugin configuration:
+
+```bash
+docker run -d \
+  --name sonarqube \
+  -p 9000:9000 \
+  -e SONAR_WEB_JAVAADDITIONALOPTS="-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-25.4.0.jar=web -Xmx2G" \
+  -e SONAR_CE_JAVAADDITIONALOPTS="-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-25.4.0.jar=ce -Xmx2G" \
+  mc1arke/sonarqube-with-community-branch-plugin:25.4
+```
+
+## Available Tags
+
+The image follows SonarQube's versioning:
+
+- `latest` - Latest stable version
+- `25.4` - SonarQube 25.4 with matching plugin version
+- `25.3` - SonarQube 25.3 with matching plugin version
+- `community` - Latest community edition
+
+<Note>
+  Always use a specific version tag in production rather than `latest` to ensure consistency.
+</Note>
+
+## Docker Image Contents
+
+The image is built from the official SonarQube image and includes:
+
+1. The Community Branch Plugin JAR in `/opt/sonarqube/extensions/plugins/`
+2. Modified web application in `/opt/sonarqube/web/`
+3. Pre-configured Java agent settings
+
+## Building from Source
+
+To build the Docker image yourself:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/mc1arke/sonarqube-community-branch-plugin.git
+    cd sonarqube-community-branch-plugin
+    ```
+  </Step>
+
+  <Step title="Build with Docker Compose">
+    ```bash
+    docker compose up --build
+    ```
+  </Step>
+</Steps>
+
+## Verification
+
+After starting the container:
+
+1. Wait for SonarQube to start (check logs with `docker logs sonarqube`)
+2. Navigate to `http://localhost:9000`
+3. Log in with default credentials
+4. Go to **Administration > Marketplace > Installed**
+5. Verify the Community Branch Plugin is listed
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Container exits immediately">
+    Check the logs:
+    ```bash
+    docker logs sonarqube
+    ```
+    Common issues:
+    - Insufficient memory (increase Docker memory allocation)
+    - Port 9000 already in use
+    - Database connection issues
+  </Accordion>
+
+  <Accordion title="Cannot connect to SonarQube">
+    - Verify the container is running: `docker ps`
+    - Check port mapping is correct
+    - Wait for startup to complete (can take 1-2 minutes)
+  </Accordion>
+
+  <Accordion title="Branch features not working">
+    - Verify you're not overriding the Java agent environment variables
+    - Check container logs for plugin errors
+    - Ensure you're using a compatible image version
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Compose Setup" icon="layer-group" href="/installation/docker-compose">
+    Set up with PostgreSQL database
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/global-settings">
+    Configure branch analysis
+  </Card>
+</CardGroup>

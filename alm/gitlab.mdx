@@ -1,0 +1,261 @@
+---
+title: GitLab Integration
+description: Configure GitLab merge request decoration with discussions, pipeline status, and inline comments
+---
+
+The GitLab integration provides comprehensive merge request decoration using GitLab's discussions API and pipeline status, including inline code comments, quality gate reporting, and discussion management.
+
+## Features
+
+The GitLab integration provides:
+
+- **Pipeline Status**: Sets commit status with pass/fail state and coverage metrics
+- **Inline Discussions**: Creates discussions on specific lines of changed code
+- **Summary Discussion**: Posts a summary comment with overall analysis results
+- **Discussion Management**: Automatically resolves/unresolves discussions based on issue status
+- **Monorepo Support**: Separate pipeline status for each project in a monorepo
+
+### Pipeline Status Details
+
+The pipeline status includes:
+- Status name: "SonarQube" (or "SonarQube - \{project key\}" for monorepos)
+- Description: "SonarQube Status" (or "SonarQube Status - \{project name\}" for monorepos)
+- State: SUCCESS or FAILED based on quality gate
+- Target URL: Link to the SonarQube dashboard
+- Coverage: New code coverage percentage (if available)
+- Pipeline ID: Optional association with a GitLab CI pipeline
+
+### Discussion Types
+
+1. **Inline Discussions**: Created on specific lines where issues are detected
+2. **Summary Discussion**: Created at the merge request level with overall results
+3. Discussions are automatically resolved when the quality gate passes
+
+## Authentication
+
+GitLab integration uses **Personal Access Tokens** or **Project Access Tokens** for authentication.
+
+### Token Requirements
+
+Your token must have the following scopes:
+- `api`: Full API access (required for creating discussions and updating pipeline status)
+
+Alternatively, for more restricted access:
+- `read_api`: Read API access
+- `write_repository`: Write access to repository
+
+### Creating a Personal Access Token
+
+<Steps>
+  <Step title="Navigate to User Settings">
+    In GitLab, go to your user profile → **Settings** → **Access Tokens**
+  </Step>
+  
+  <Step title="Create Token">
+    - Set a name for the token (e.g., "SonarQube Integration")
+    - Set an expiration date (optional but recommended)
+    - Select the `api` scope
+    - Click "Create personal access token"
+  </Step>
+  
+  <Step title="Save Token">
+    Copy the token immediately - it won't be shown again
+  </Step>
+</Steps>
+
+### Creating a Project Access Token (GitLab Premium)
+
+For project-specific access:
+
+<Steps>
+  <Step title="Navigate to Project Settings">
+    Go to your project → **Settings** → **Access Tokens**
+  </Step>
+  
+  <Step title="Create Token">
+    - Set a name for the token
+    - Select a role (Maintainer or Owner recommended)
+    - Select the `api` scope
+    - Click "Create project access token"
+  </Step>
+</Steps>
+
+## Configuration
+
+### Global Configuration
+
+Configure the GitLab connection in SonarQube:
+
+<Steps>
+  <Step title="Navigate to Administration">
+    Go to **Administration** → **Configuration** → **General Settings** → **ALM Integrations** → **GitLab**
+  </Step>
+  
+  <Step title="Add GitLab Configuration">
+    Click "Create configuration" and provide:
+    - **Configuration Name**: A unique identifier for this connection
+    - **GitLab API URL**: 
+      - For GitLab.com: `https://gitlab.com/api/v4`
+      - For self-hosted: `https://your-gitlab-instance.com/api/v4`
+    - **Personal Access Token**: The token created in the previous step
+  </Step>
+</Steps>
+
+### Project Configuration
+
+Bind each SonarQube project to a GitLab project:
+
+<Steps>
+  <Step title="Navigate to Project Settings">
+    Go to your project → **Administration** → **General Settings** → **Pull Request Decoration**
+  </Step>
+  
+  <Step title="Configure Project Binding">
+    Provide:
+    - **Configuration name**: Select the GitLab configuration created above
+    - **Project ID**: The GitLab project ID or path (e.g., `123456` or `group/project`)
+  </Step>
+  
+  <Step title="Optional Settings">
+    - **Monorepo**: Enable if this project is part of a monorepo to add the project key to pipeline status names
+  </Step>
+</Steps>
+
+## Scanner Configuration
+
+When running analysis on a merge request, provide these parameters:
+
+```bash
+sonar-scanner \
+  -Dsonar.pullrequest.key=123 \
+  -Dsonar.pullrequest.branch=feature-branch \
+  -Dsonar.pullrequest.base=main \
+  -Dsonar.pullrequest.gitlab.projectUrl=https://gitlab.com/group/project \
+  -Dcom.github.mc1arke.sonarqube.plugin.branch.pullrequest.gitlab.pipelineId=456789
+```
+
+### Required Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|----------|
+| `sonar.pullrequest.key` | Merge request IID (internal ID) | `123` |
+| `sonar.pullrequest.branch` | Source branch name | `feature-branch` |
+| `sonar.pullrequest.base` | Target branch name | `main` |
+
+### Optional Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|----------|
+| `sonar.pullrequest.gitlab.projectUrl` | Full project URL for constructing MR links | `https://gitlab.com/group/project` |
+| `com.github.mc1arke.sonarqube.plugin.branch.pullrequest.gitlab.pipelineId` | GitLab CI pipeline ID to associate with the commit status | `456789` |
+
+<Note>
+  The `pipelineId` parameter allows the commit status to be linked with a specific GitLab CI pipeline run, providing better integration with GitLab's CI/CD interface.
+</Note>
+
+## Discussion Management
+
+The GitLab decorator intelligently manages discussions on merge requests:
+
+### Creating Discussions
+
+- **Inline discussions** are created for each issue found on changed lines
+- Each discussion includes:
+  - Issue description and severity
+  - Link to the issue in SonarQube
+  - Position information (file path, line number)
+  - Associated with the specific commit SHA
+
+### Updating Discussions
+
+- Existing discussions are updated when issues change
+- Comments are added to discussions for status updates
+- Discussions are resolved when:
+  - The associated issue is fixed
+  - The quality gate passes (for the summary discussion)
+
+### Deleting Discussions
+
+- Old discussions are deleted when issues are no longer present
+- The plugin tracks discussions by parsing issue URLs from previous comments
+- Only discussions created by the authenticated user are modified
+
+## Inline Comment Format
+
+Inline comments on merge requests include:
+
+- Issue severity and type
+- Issue message
+- Link to view the issue in SonarQube
+- Effort estimate to fix (if available)
+
+Comments are created using GitLab's "diff position" feature to anchor them to specific lines in the diff.
+
+## Monorepo Support
+
+For monorepo setups:
+
+1. Enable the **Monorepo** option in project settings
+2. Each project creates a separate pipeline status:
+   - Name: `SonarQube - {project-key}`
+   - Description: `SonarQube Status - {project-name}`
+3. This allows multiple SonarQube projects to decorate the same MR without conflicts
+
+## Implementation Details
+
+The GitLab decorator is implemented in:
+- `GitlabMergeRequestDecorator` (src/main/java/com/github/mc1arke/sonarqube/plugin/ce/pullrequest/gitlab/)
+- `GitlabRestClient` (src/main/java/com/github/mc1arke/sonarqube/plugin/almclient/gitlab/)
+
+### Key Behaviors
+
+- Uses GitLab REST API v4
+- Authenticates using `PRIVATE-TOKEN` header
+- Supports pagination for fetching commits and discussions
+- Automatically follows `Link` headers for multi-page results
+- Creates commit notes with diff position information
+- Resolves discussions when quality gate passes
+
+### API Endpoints Used
+
+- `GET /projects/{id}/merge_requests/{iid}` - Get MR details
+- `GET /projects/{id}/merge_requests/{iid}/commits` - Get MR commits
+- `GET /projects/{id}/merge_requests/{iid}/discussions` - Get discussions
+- `POST /projects/{id}/merge_requests/{iid}/discussions` - Create discussion
+- `POST /projects/{id}/merge_requests/{iid}/discussions/{id}/notes` - Add note to discussion
+- `PUT /projects/{id}/merge_requests/{iid}/discussions/{id}` - Resolve discussion
+- `DELETE /projects/{id}/merge_requests/{iid}/discussions/{id}/notes/{note_id}` - Delete note
+- `POST /projects/{id}/statuses/{sha}` - Set commit status
+
+## Troubleshooting
+
+### API URL Format
+
+Ensure your GitLab API URL includes `/api/v4`:
+- ✅ `https://gitlab.com/api/v4`
+- ✅ `https://gitlab.example.com/api/v4`
+- ❌ `https://gitlab.com`
+- ❌ `https://gitlab.example.com`
+
+### Project ID vs Project Path
+
+GitLab accepts both numeric project IDs and URL-encoded project paths:
+- Numeric ID: `123456`
+- Project path: `group/subgroup/project` (will be URL-encoded automatically)
+
+### Token Permissions
+
+If discussions or pipeline status are not appearing, verify your token has the `api` scope. Limited scopes may not provide sufficient permissions.
+
+### Merge Request IID
+
+Use the merge request IID (the number shown in the GitLab UI), not the internal database ID:
+- ✅ IID: `123` (from `!123`)
+- ❌ ID: `456789` (internal database identifier)
+
+### Discussion Position Errors
+
+If inline comments fail to appear:
+- Ensure the analysis includes SCM information (`git blame` data)
+- Verify the file path matches exactly between GitLab and SonarQube
+- Check that the line number is within the changed diff

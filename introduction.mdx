@@ -1,0 +1,166 @@
+---
+title: "Introduction"
+description: "Enable branch analysis and pull request decoration in SonarQube Community Edition"
+---
+
+<div style={{
+  background: 'linear-gradient(135deg, #2c0444 0%, #f13155 100%)',
+  padding: '3rem 2rem',
+  borderRadius: '12px',
+  marginBottom: '2rem',
+  color: 'white'
+}}>
+  <h1 style={{ color: 'white', fontSize: '2.5rem', fontWeight: '700', marginBottom: '1rem' }}>
+    SonarQube Community Branch Plugin
+  </h1>
+  <p style={{ color: 'white', fontSize: '1.25rem', opacity: '0.95' }}>
+    Unlock branch analysis and pull request decoration features in SonarQube Community Edition without upgrading to commercial editions.
+  </p>
+</div>
+
+## What is the Community Branch Plugin?
+
+The SonarQube Community Branch Plugin extends the free Community Edition of SonarQube with powerful branch analysis and pull request decoration capabilities typically reserved for commercial editions. This plugin enables teams to analyze multiple branches, decorate pull requests with quality metrics, and integrate seamlessly with popular ALM platforms.
+
+<CardGroup cols={2}>
+  <Card title="Branch Analysis" icon="code-branch" href="/configuration/branch-analysis">
+    Analyze multiple branches and track quality across your entire codebase
+  </Card>
+  <Card title="PR Decoration" icon="code-pull-request" href="/configuration/pull-request-decoration">
+    Automatic pull request comments with quality gate status and inline issues
+  </Card>
+  <Card title="Multi-ALM Support" icon="cloud" href="/configuration/alm-integrations">
+    GitHub, GitLab, Azure DevOps, and Bitbucket integration
+  </Card>
+  <Card title="CI/CD Auto-config" icon="gears" href="/ci-cd/overview">
+    Automatic configuration for popular CI/CD platforms
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Branch Analysis in Community Edition" icon="code-branch">
+    Analyze multiple branches of your project and track code quality trends over time. The plugin enables the `sonar.branch.name` parameter, allowing you to maintain separate quality profiles for different branches.
+  </Accordion>
+
+  <Accordion title="Pull Request Decoration" icon="comment-dots">
+    Automatically decorate pull requests with:
+    - Quality gate status (pass/fail)
+    - New issues introduced in the PR
+    - Code coverage changes
+    - Inline comments on specific lines
+  </Accordion>
+
+  <Accordion title="Multi-Platform ALM Integration" icon="plug">
+    Native integration with:
+    - **GitHub**: Comments, status checks, and code annotations
+    - **GitLab**: Merge request comments and discussions
+    - **Azure DevOps**: Pull request threads and build status
+    - **Bitbucket Cloud & Server**: PR comments and inline annotations
+  </Accordion>
+
+  <Accordion title="CI/CD Auto-Configuration" icon="robot">
+    Automatic detection and configuration for:
+    - GitHub Actions
+    - GitLab CI
+    - Azure Pipelines
+    - Jenkins
+    - Bitbucket Pipelines
+    - Cirrus CI
+    - CodeMagic
+  </Accordion>
+
+  <Accordion title="Flexible Deployment Options" icon="server">
+    Deploy via:
+    - Manual JAR installation
+    - Official Docker image
+    - Docker Compose
+    - Kubernetes with Helm charts
+  </Accordion>
+
+  <Accordion title="Branch Retention Policies" icon="clock">
+    Customize which branches are kept when inactive:
+    - Configure retention periods
+    - Protect specific branches from deletion
+    - Regular expression patterns for branch names
+  </Accordion>
+</AccordionGroup>
+
+## Quick Start
+
+Get up and running in minutes with our installation guides:
+
+<CardGroup cols={3}>
+  <Card title="Docker" icon="docker" href="/installation/docker">
+    Pull the pre-configured Docker image
+  </Card>
+  <Card title="Kubernetes" icon="dharmachakra" href="/installation/kubernetes">
+    Deploy with the official Helm chart
+  </Card>
+  <Card title="Manual Install" icon="download" href="/installation/manual">
+    Install the plugin JAR directly
+  </Card>
+</CardGroup>
+
+<Note>
+  **Plugin Version Compatibility**: The plugin's major and minor versions match the SonarQube version. For example, version 25.4.0 of the plugin is compatible with SonarQube 25.4.x.
+</Note>
+
+## How It Works
+
+The Community Branch Plugin works by:
+
+1. **Java Agent Instrumentation**: Uses bytecode manipulation to extend SonarQube's functionality at runtime
+2. **Web UI Enhancement**: Replaces frontend components to display branch and PR data
+3. **Compute Engine Extension**: Adds post-analysis tasks to decorate pull requests
+4. **Scanner Auto-Configuration**: Detects CI environment and automatically sets branch parameters
+
+## Important Notices
+
+<Warning>
+  **No Official Support**: This plugin is not maintained or supported by SonarSource. Support is only available through [GitHub issues](https://github.com/mc1arke/sonarqube-community-branch-plugin/issues) or community channels like StackOverflow.
+</Warning>
+
+<Warning>
+  **Migration to Commercial Editions**: Migrating from Community Edition with this plugin to a commercial edition may result in data loss, as compatibility is untested.
+</Warning>
+
+## Next Steps
+
+<Steps>
+  <Step title="Check Compatibility">
+    Review the [compatibility matrix](/compatibility) to ensure your SonarQube version is supported.
+  </Step>
+  <Step title="Choose Installation Method">
+    Select an [installation method](/installation/overview) that fits your infrastructure.
+  </Step>
+  <Step title="Configure Global Settings">
+    Set up [global configuration](/configuration/global-settings) for your SonarQube instance.
+  </Step>
+  <Step title="Integrate with Your ALM">
+    Configure your [ALM integration](/configuration/alm-integrations) for PR decoration.
+  </Step>
+  <Step title="Set Up CI/CD">
+    Configure your [CI/CD pipeline](/ci-cd/overview) to run branch analysis.
+  </Step>
+</Steps>
+
+## Community & Contributing
+
+This is an open-source project maintained by the community. We welcome contributions!
+
+<CardGroup cols={2}>
+  <Card title="View on GitHub" icon="github" href="https://github.com/mc1arke/sonarqube-community-branch-plugin">
+    Star the repository and view the source code
+  </Card>
+  <Card title="Contributing Guide" icon="code-pull-request" href="/development/contributing">
+    Learn how to contribute to the project
+  </Card>
+  <Card title="Report Issues" icon="bug" href="https://github.com/mc1arke/sonarqube-community-branch-plugin/issues">
+    Found a bug? Report it on GitHub
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/development/architecture">
+    Understand how the plugin works internally
+  </Card>
+</CardGroup>

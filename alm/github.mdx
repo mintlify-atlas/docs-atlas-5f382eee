@@ -1,0 +1,207 @@
+---
+title: GitHub Integration
+description: Configure GitHub pull request decoration with check runs, annotations, and comments
+---
+
+The GitHub integration provides comprehensive pull request decoration using GitHub's Check Runs API, including inline code annotations, quality gate status, and optional summary comments.
+
+## Features
+
+The GitHub integration provides:
+
+- **Check Runs**: Creates a GitHub Check Run for each analysis with pass/fail status
+- **Inline Annotations**: Adds code annotations directly on changed lines in the pull request
+- **Quality Gate Status**: Reports overall quality gate results (SUCCESS/FAILURE)
+- **Summary Comments**: Optional PR comments with detailed analysis results
+- **Monorepo Support**: Separate check runs for each project in a monorepo
+
+### Check Run Details
+
+Each check run includes:
+- Check run name: "SonarQube Code Analysis" (or "[Project Name] SonarQube Code Analysis" for monorepos)
+- Completion status with pass/fail conclusion
+- Link to the SonarQube dashboard
+- Analysis summary with quality gate results
+- Inline annotations for each issue on changed code
+
+### Annotation Levels
+
+Issues are mapped to GitHub annotation levels based on severity:
+
+| SonarQube Severity | GitHub Annotation Level |
+|--------------------|------------------------|
+| INFO, LOW | NOTICE |
+| MEDIUM | WARNING |
+| HIGH, BLOCKER | FAILURE |
+
+## Authentication
+
+GitHub integration uses **GitHub App authentication** for secure, fine-grained access control.
+
+### Prerequisites
+
+1. A GitHub App installed on your organization or repository
+2. The app must have these permissions:
+   - **Pull Requests**: Read & Write
+   - **Checks**: Read & Write
+   - **Contents**: Read
+3. App ID from your GitHub App settings
+4. Private key (PEM format) generated from your GitHub App
+
+### Creating a GitHub App
+
+<Steps>
+  <Step title="Navigate to GitHub App Settings">
+    Go to your GitHub organization or user settings and select "GitHub Apps" → "New GitHub App"
+  </Step>
+  
+  <Step title="Configure App Settings">
+    - Set a name for your app (e.g., "SonarQube Code Analysis")
+    - Set a homepage URL (can be your SonarQube instance URL)
+    - Uncheck "Webhook" if you don't need webhook notifications
+  </Step>
+  
+  <Step title="Set Permissions">
+    Under "Repository permissions":
+    - **Checks**: Read & Write
+    - **Pull requests**: Read & Write
+    - **Contents**: Read
+  </Step>
+  
+  <Step title="Install the App">
+    After creating the app:
+    - Note the **App ID** from the app settings page
+    - Generate and download a **private key** (PEM file)
+    - Install the app on your repositories
+  </Step>
+</Steps>
+
+## Configuration
+
+### Global Configuration
+
+Configure the GitHub connection in SonarQube:
+
+<Steps>
+  <Step title="Navigate to Administration">
+    Go to **Administration** → **Configuration** → **General Settings** → **ALM Integrations** → **GitHub**
+  </Step>
+  
+  <Step title="Add GitHub Configuration">
+    Click "Create configuration" and provide:
+    - **Configuration Name**: A unique identifier for this connection
+    - **GitHub API URL**: 
+      - For GitHub.com: `https://api.github.com`
+      - For GitHub Enterprise: `https://your-github-instance.com/api/v3`
+    - **GitHub App ID**: The App ID from your GitHub App
+    - **Private Key**: Paste the contents of the PEM private key file
+  </Step>
+</Steps>
+
+### Project Configuration
+
+Bind each SonarQube project to a GitHub repository:
+
+<Steps>
+  <Step title="Navigate to Project Settings">
+    Go to your project → **Administration** → **General Settings** → **Pull Request Decoration**
+  </Step>
+  
+  <Step title="Configure Project Binding">
+    Provide:
+    - **Configuration name**: Select the GitHub configuration created above
+    - **Repository identifier**: The repository in format `owner/repo` (e.g., `mc1arke/sonarqube-community-branch-plugin`)
+  </Step>
+  
+  <Step title="Optional Settings">
+    - **Summary Comment Enabled**: Enable to post a summary comment on each PR (in addition to the check run)
+    - **Monorepo**: Enable if this project is part of a monorepo to add the project name to check run titles
+  </Step>
+</Steps>
+
+## Scanner Configuration
+
+When running analysis on a pull request, provide these parameters:
+
+```bash
+sonar-scanner \
+  -Dsonar.pullrequest.key=123 \
+  -Dsonar.pullrequest.branch=feature-branch \
+  -Dsonar.pullrequest.base=main
+```
+
+### Required Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|----------|
+| `sonar.pullrequest.key` | Pull request number | `123` |
+| `sonar.pullrequest.branch` | Source branch name | `feature-branch` |
+| `sonar.pullrequest.base` | Target branch name | `main` |
+
+## Summary Comments
+
+When **Summary Comment Enabled** is activated, the plugin posts a detailed markdown comment on the PR with:
+
+- Quality gate status
+- New issues count by severity
+- Code coverage metrics
+- Duplications metrics
+- Link to full analysis
+
+### Comment Management
+
+The plugin automatically:
+- Creates a new comment for each analysis
+- Deletes previous comments from the same bot user for the same project
+- Identifies project-specific comments using a "Project ID" marker
+- Only removes comments created by bot users (type "Bot")
+
+## Monorepo Support
+
+For monorepo setups:
+
+1. Enable the **Monorepo** option in project settings
+2. Each project creates a separate check run with the format: `[Project Name] SonarQube Code Analysis`
+3. This allows multiple SonarQube projects to decorate the same PR without conflicts
+
+## Implementation Details
+
+The GitHub decorator is implemented in:
+- `GithubPullRequestDecorator` (src/main/java/com/github/mc1arke/sonarqube/plugin/ce/pullrequest/github/)
+- `GithubClientFactory` (src/main/java/com/github/mc1arke/sonarqube/plugin/almclient/github/)
+
+### Key Behaviors
+
+- Uses the GitHub Java API library (`org.kohsuke.github`)
+- Authenticates using JWT tokens generated from the GitHub App private key
+- Check runs are completed immediately with analysis results
+- Annotations are limited to issues on changed code with SCM information
+- External ID on check runs matches the SonarQube analysis ID
+
+## Troubleshooting
+
+### Private Key Format
+
+Ensure your private key is in PEM format:
+```
+-----BEGIN RSA PRIVATE KEY-----
+...
+-----END RSA PRIVATE KEY-----
+```
+
+### Repository Format
+
+The repository identifier must be in `owner/repo` format. Common mistakes:
+- ❌ `https://github.com/owner/repo`
+- ❌ `github.com/owner/repo`
+- ✅ `owner/repo`
+
+### App Installation
+
+Verify the GitHub App is installed on the repository and has the required permissions. Check the app's installation settings in GitHub.
+
+### API URL
+
+For GitHub Enterprise, ensure the API URL includes `/api/v3`:
+- ✅ `https://github.example.com/api/v3`
+- ❌ `https://github.example.com`

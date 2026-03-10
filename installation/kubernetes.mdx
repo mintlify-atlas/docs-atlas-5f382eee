@@ -1,0 +1,422 @@
+---
+title: Kubernetes Installation
+description: Deploy using the official SonarQube Helm chart
+---
+
+Deploy SonarQube with the Community Branch Plugin on Kubernetes using the official SonarQube Helm chart.
+
+## Prerequisites
+
+- Kubernetes cluster (1.19+)
+- Helm 3 installed and configured
+- `kubectl` configured to access your cluster
+- Understanding of Kubernetes concepts (pods, volumes, services)
+
+## Helm Chart Configuration
+
+The official [SonarQube Helm Chart](https://github.com/SonarSource/helm-chart-sonarqube/tree/master/charts/sonarqube) can be configured to install and run the Community Branch Plugin.
+
+<Warning>
+  Replace `${version}` with the actual plugin version number (e.g., `25.4.0`) in all configuration examples below.
+</Warning>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Add the SonarQube Helm repository">
+    ```bash
+    helm repo add sonarqube https://SonarSource.github.io/helm-chart-sonarqube
+    helm repo update
+    ```
+  </Step>
+
+  <Step title="Create values file">
+    Create a `values.yaml` file with the Community Branch Plugin configuration:
+    
+    ```yaml values.yaml
+    community:
+      enabled: true
+
+    plugins:
+      install:
+        - https://github.com/mc1arke/sonarqube-community-branch-plugin/releases/download/${version}/sonarqube-community-branch-plugin-${version}.jar
+    
+    sonarProperties:
+      sonar.web.javaAdditionalOpts: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=web"
+      sonar.ce.javaAdditionalOpts: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=ce"
+
+    extraVolumes:
+      - name: webapp
+        emptyDir:
+          sizeLimit: 50Mi
+    
+    extraVolumeMounts:
+      - name: webapp
+        mountPath: /opt/sonarqube/web
+    
+    extraInitContainers:
+      - name: download-webapp
+        image: busybox:1.37
+        volumeMounts:
+          - name: webapp
+            mountPath: /web
+        command:
+          - sh
+          - -c
+          - wget -O /tmp/sonarqube-webapp.zip https://github.com/mc1arke/sonarqube-community-branch-plugin/releases/download/${version}/sonarqube-webapp.zip &&
+            unzip -o /tmp/sonarqube-webapp.zip -d /web &&
+            chmod -R 755 /web &&
+            chown -R 1000:0 /web &&
+            rm -f /tmp/sonarqube-webapp.zip
+    ```
+  </Step>
+
+  <Step title="Install the Helm chart">
+    ```bash
+    helm install sonarqube sonarqube/sonarqube \
+      -f values.yaml \
+      --namespace sonarqube \
+      --create-namespace
+    ```
+  </Step>
+
+  <Step title="Wait for deployment">
+    Monitor the deployment status:
+    
+    ```bash
+    kubectl get pods -n sonarqube -w
+    ```
+    
+    Wait for all pods to reach `Running` state.
+  </Step>
+
+  <Step title="Access SonarQube">
+    Get the service URL:
+    
+    ```bash
+    kubectl get svc -n sonarqube
+    ```
+    
+    Or use port-forward for testing:
+    ```bash
+    kubectl port-forward -n sonarqube svc/sonarqube-sonarqube 9000:9000
+    ```
+    
+    Access at `http://localhost:9000` with default credentials:
+    - Username: `admin`
+    - Password: `admin`
+  </Step>
+</Steps>
+
+## Configuration Breakdown
+
+Let's understand each section of the Helm values:
+
+### Community Edition
+
+```yaml
+community:
+  enabled: true
+```
+
+Enables SonarQube Community Edition features.
+
+### Plugin Installation
+
+```yaml
+plugins:
+  install:
+    - https://github.com/mc1arke/sonarqube-community-branch-plugin/releases/download/${version}/sonarqube-community-branch-plugin-${version}.jar
+```
+
+Downloads and installs the plugin JAR from GitHub releases during initialization.
+
+### Java Agent Configuration
+
+```yaml
+sonarProperties:
+  sonar.web.javaAdditionalOpts: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=web"
+  sonar.ce.javaAdditionalOpts: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=ce"
+```
+
+<Warning>
+  The Java agent configuration is critical. Both the web server and compute engine must have the appropriate javaagent settings or the plugin will not function.
+</Warning>
+
+### Web Application Volume
+
+```yaml
+extraVolumes:
+  - name: webapp
+    emptyDir:
+      sizeLimit: 50Mi
+
+extraVolumeMounts:
+  - name: webapp
+    mountPath: /opt/sonarqube/web
+```
+
+Creates a temporary volume for the modified web application files.
+
+### Init Container
+
+```yaml
+extraInitContainers:
+  - name: download-webapp
+    image: busybox:1.37
+    volumeMounts:
+      - name: webapp
+        mountPath: /web
+    command:
+      - sh
+      - -c
+      - wget -O /tmp/sonarqube-webapp.zip https://github.com/mc1arke/sonarqube-community-branch-plugin/releases/download/${version}/sonarqube-webapp.zip &&
+        unzip -o /tmp/sonarqube-webapp.zip -d /web &&
+        chmod -R 755 /web &&
+        chown -R 1000:0 /web &&
+        rm -f /tmp/sonarqube-webapp.zip
+```
+
+Downloads and extracts the modified web application before SonarQube starts.
+
+## Complete Example
+
+Here's a complete example for SonarQube 25.4:
+
+```yaml values-complete.yaml
+community:
+  enabled: true
+
+plugins:
+  install:
+    - https://github.com/mc1arke/sonarqube-community-branch-plugin/releases/download/25.4.0/sonarqube-community-branch-plugin-25.4.0.jar
+
+sonarProperties:
+  sonar.web.javaAdditionalOpts: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-25.4.0.jar=web"
+  sonar.ce.javaAdditionalOpts: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-25.4.0.jar=ce"
+
+extraVolumes:
+  - name: webapp
+    emptyDir:
+      sizeLimit: 50Mi
+
+extraVolumeMounts:
+  - name: webapp
+    mountPath: /opt/sonarqube/web
+
+extraInitContainers:
+  - name: download-webapp
+    image: busybox:1.37
+    volumeMounts:
+      - name: webapp
+        mountPath: /web
+    command:
+      - sh
+      - -c
+      - wget -O /tmp/sonarqube-webapp.zip https://github.com/mc1arke/sonarqube-community-branch-plugin/releases/download/25.4.0/sonarqube-webapp.zip &&
+        unzip -o /tmp/sonarqube-webapp.zip -d /web &&
+        chmod -R 755 /web &&
+        chown -R 1000:0 /web &&
+        rm -f /tmp/sonarqube-webapp.zip
+
+# Optional: Configure PostgreSQL
+postgresql:
+  enabled: true
+  auth:
+    username: sonar
+    password: sonar
+    database: sonar
+
+# Optional: Configure persistence
+persistence:
+  enabled: true
+  size: 10Gi
+
+# Optional: Configure ingress
+ingress:
+  enabled: true
+  hosts:
+    - name: sonarqube.example.com
+      path: /
+```
+
+Install with:
+
+```bash
+helm install sonarqube sonarqube/sonarqube \
+  -f values-complete.yaml \
+  --namespace sonarqube \
+  --create-namespace
+```
+
+## Production Configuration
+
+### Resource Limits
+
+Add resource requests and limits:
+
+```yaml
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+```
+
+### Persistence
+
+Enable persistent storage:
+
+```yaml
+persistence:
+  enabled: true
+  storageClass: "your-storage-class"
+  size: 20Gi
+```
+
+### External Database
+
+Use an external PostgreSQL database:
+
+```yaml
+postgresql:
+  enabled: false
+
+jdbcOverwrite:
+  enable: true
+  jdbcUrl: "jdbc:postgresql://your-postgres-host:5432/sonar"
+  jdbcUsername: "sonar"
+  jdbcPassword: "your-secure-password"
+```
+
+### Ingress
+
+Configure ingress with TLS:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - name: sonarqube.example.com
+      path: /
+  tls:
+    - secretName: sonarqube-tls
+      hosts:
+        - sonarqube.example.com
+```
+
+## Upgrading
+
+To upgrade to a new version:
+
+<Steps>
+  <Step title="Update values file">
+    Update the `${version}` placeholders in your `values.yaml` with the new version number.
+  </Step>
+
+  <Step title="Update Helm repository">
+    ```bash
+    helm repo update
+    ```
+  </Step>
+
+  <Step title="Upgrade release">
+    ```bash
+    helm upgrade sonarqube sonarqube/sonarqube \
+      -f values.yaml \
+      -n sonarqube
+    ```
+  </Step>
+
+  <Step title="Monitor rollout">
+    ```bash
+    kubectl rollout status deployment/sonarqube-sonarqube -n sonarqube
+    ```
+  </Step>
+</Steps>
+
+## Management Commands
+
+### View logs
+
+```bash
+kubectl logs -n sonarqube -l app=sonarqube -f
+```
+
+### Restart deployment
+
+```bash
+kubectl rollout restart deployment/sonarqube-sonarqube -n sonarqube
+```
+
+### Uninstall
+
+```bash
+helm uninstall sonarqube -n sonarqube
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Init container fails to download webapp">
+    Check the init container logs:
+    ```bash
+    kubectl logs -n sonarqube <pod-name> -c download-webapp
+    ```
+    
+    Common issues:
+    - Network connectivity to GitHub
+    - Invalid version number in URL
+    - Insufficient volume permissions
+  </Accordion>
+
+  <Accordion title="Plugin not loading">
+    Verify the plugin was downloaded:
+    ```bash
+    kubectl exec -n sonarqube <pod-name> -- ls -l /opt/sonarqube/extensions/plugins/
+    ```
+    
+    Check Java agent configuration:
+    ```bash
+    kubectl exec -n sonarqube <pod-name> -- cat /opt/sonarqube/conf/sonar.properties
+    ```
+  </Accordion>
+
+  <Accordion title="Pod stays in Init status">
+    The init container might be taking time to download files:
+    ```bash
+    kubectl describe pod -n sonarqube <pod-name>
+    kubectl logs -n sonarqube <pod-name> -c download-webapp
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection errors">
+    Check database connectivity:
+    ```bash
+    kubectl logs -n sonarqube <pod-name>
+    ```
+    
+    Verify JDBC configuration in your values file.
+  </Accordion>
+</AccordionGroup>
+
+## Verification
+
+After deployment:
+
+1. Access SonarQube web interface
+2. Log in as administrator
+3. Go to **Administration > Marketplace > Installed**
+4. Verify the Community Branch Plugin is listed and active
+5. Create a test project to verify branch analysis works
+
+## Next Steps
+
+<Card title="Configuration" icon="gear" href="/configuration/global-settings">
+  Configure global settings and set up branch analysis
+</Card>

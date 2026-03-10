@@ -1,0 +1,271 @@
+---
+title: GitHub Actions
+description: Configure SonarQube analysis in GitHub Actions workflows
+---
+
+## Auto-Configuration
+
+The plugin automatically detects GitHub Actions environments and configures branch and pull request analysis without manual property configuration.
+
+### Detection
+
+The auto-configurer activates when:
+
+- `GITHUB_ACTIONS=true` is set in the environment
+- `GITHUB_REF` contains a valid reference
+
+### Environment Variables Used
+
+| Variable | Purpose | Example |
+|----------|---------|----------|
+| `GITHUB_ACTIONS` | Detects GitHub Actions environment | `true` |
+| `GITHUB_REF` | Full Git reference | `refs/pull/123/merge` or `refs/heads/main` |
+| `GITHUB_HEAD_REF` | PR source branch (PRs only) | `feature/add-login` |
+| `GITHUB_BASE_REF` | PR target branch (PRs only) | `main` |
+| `GITHUB_REF_NAME` | Branch name (branch builds) | `develop` |
+
+## Configuration Behavior
+
+### Pull Request Detection
+
+The plugin detects pull requests when:
+
+- `GITHUB_REF` matches pattern: `refs/pull/{number}/merge`
+- `GITHUB_HEAD_REF` is not empty
+
+**Automatically configured properties:**
+
+- `sonar.pullrequest.key` - Extracted from `GITHUB_REF` (the PR number)
+- `sonar.pullrequest.branch` - Set to `GITHUB_HEAD_REF`
+- `sonar.pullrequest.base` - Set to `GITHUB_BASE_REF`
+
+### Branch Analysis
+
+For non-PR builds (direct branch pushes):
+
+**Automatically configured properties:**
+
+- `sonar.branch.name` - Set to `GITHUB_REF_NAME`
+
+## Usage Examples
+
+### Basic Configuration
+
+<CodeGroup>
+
+```yaml Official SonarQube Scan Action
+name: SonarQube Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v2
+        with:
+          args: >
+            -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+```
+
+```yaml Maven Project
+name: Build and Analyze
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+
+      - name: Build and analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        run: |
+          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+```
+
+```yaml Gradle Project
+name: Build and Analyze
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build and analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        run: |
+          ./gradlew build sonar \
+            -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+```
+
+```yaml Node.js Project
+name: SonarQube Analysis
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm test -- --coverage
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v2
+        with:
+          args: >
+            -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+```
+
+</CodeGroup>
+
+## Important Notes
+
+<Warning>
+**GitHub Pull Requests Require `sonar.scm.revision`**
+
+Always set `-Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}` when analyzing GitHub pull requests. This ensures accurate code attribution.
+</Warning>
+
+### Shallow Clones
+
+Disable shallow clones to ensure accurate blame information:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+```
+
+### Secrets Configuration
+
+1. Create a SonarQube token in your SonarQube instance
+2. Add it as a repository secret named `SONAR_TOKEN`
+3. Add your SonarQube server URL as a variable named `SONAR_HOST_URL`
+
+### Trigger Configuration
+
+Configure your workflow to run on:
+
+- **Push events** to main/protected branches for branch analysis
+- **Pull request events** (`opened`, `synchronize`, `reopened`) for PR decoration
+
+## Manual Override
+
+If you need to override the auto-detected values:
+
+```yaml
+- name: SonarQube Scan
+  uses: sonarsource/sonarqube-scan-action@v2
+  with:
+    args: >
+      -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
+      -Dsonar.pullrequest.branch=${{ github.head_ref }}
+      -Dsonar.pullrequest.base=${{ github.base_ref }}
+      -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+  env:
+    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+```
+
+## Troubleshooting
+
+### PR Decoration Not Working
+
+1. Verify `sonar.scm.revision` is set correctly
+2. Check that GitHub integration is configured in SonarQube
+3. Ensure the GitHub App has appropriate permissions
+4. Verify `sonar.core.serverBaseURL` is set in SonarQube settings
+
+### Branch Not Detected
+
+Ensure `GITHUB_REF_NAME` is available in your environment. You can debug with:
+
+```yaml
+- name: Debug Environment
+  run: |
+    echo "GITHUB_ACTIONS=$GITHUB_ACTIONS"
+    echo "GITHUB_REF=$GITHUB_REF"
+    echo "GITHUB_REF_NAME=$GITHUB_REF_NAME"
+    echo "GITHUB_HEAD_REF=$GITHUB_HEAD_REF"
+    echo "GITHUB_BASE_REF=$GITHUB_BASE_REF"
+```

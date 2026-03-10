@@ -1,0 +1,129 @@
+---
+title: Version Compatibility
+description: Understanding SonarQube Community Branch Plugin version compatibility and matching scheme
+---
+
+## Version Matching Scheme
+
+The SonarQube Community Branch Plugin follows a strict version matching policy to ensure compatibility with SonarQube installations.
+
+<Note>
+The plugin's **major and minor versions** match the SonarQube version it is compatible with. For example, version `25.4.0` of the plugin is compatible with SonarQube `25.4.x`.
+</Note>
+
+### Version Format
+
+The plugin uses semantic versioning aligned with SonarQube:
+
+```
+Plugin Version:    25.4.0
+                   │  │  │
+                   │  │  └─── Patch version (plugin updates)
+                   │  └────── Minor version (matches SonarQube)
+                   └───────── Major version (matches SonarQube)
+
+Compatible with:   SonarQube 25.4.x
+```
+
+## Compatibility Rules
+
+<CardGroup cols={2}>
+  <Card title="Matching Versions" icon="check">
+    Plugin version `25.4.0` works with SonarQube `25.4.0`, `25.4.1`, `25.4.2`, etc.
+  </Card>
+  <Card title="Patch Tolerance" icon="info">
+    Different patch versions of the plugin may work with the same SonarQube minor version.
+  </Card>
+</CardGroup>
+
+<Warning>
+**Important Compatibility Notes:**
+- Older plugin versions are **not guaranteed to work** with newer SonarQube versions
+- Newer SonarQube versions are **not guaranteed to work** with previous plugin versions
+- Always use the plugin version that matches your SonarQube installation's major and minor version
+</Warning>
+
+## Compatibility Matrix
+
+| Plugin Version | Compatible SonarQube Versions | Status |
+|----------------|-------------------------------|--------|
+| 25.4.x         | 25.4.0 - 25.4.x              | Current |
+| 25.3.x         | 25.3.0 - 25.3.x              | Supported |
+| 25.2.x         | 25.2.0 - 25.2.x              | Supported |
+| 25.1.x         | 25.1.0 - 25.1.x              | Supported |
+| 25.0.x         | 25.0.0 - 25.0.x              | Supported |
+| 24.x.x         | 24.x.0 - 24.x.x              | Legacy |
+
+<Note>
+For the most up-to-date compatibility information, always check the [GitHub releases page](https://github.com/mc1arke/sonarqube-community-branch-plugin/releases) for your specific SonarQube version.
+</Note>
+
+## Finding the Right Version
+
+<AccordionGroup>
+  <Accordion title="Determine Your SonarQube Version">
+    Check your SonarQube version by:
+    1. Logging into your SonarQube instance
+    2. Navigating to **Administration > System**
+    3. Looking for the version number in the **System Information** section
+    
+    Alternatively, check the footer of any SonarQube page.
+  </Accordion>
+
+  <Accordion title="Download the Matching Plugin">
+    Once you know your SonarQube version:
+    1. Go to the [plugin releases page](https://github.com/mc1arke/sonarqube-community-branch-plugin/releases)
+    2. Find the release matching your SonarQube major.minor version
+    3. Download both:
+       - `sonarqube-community-branch-plugin-{version}.jar`
+       - `sonarqube-webapp.zip`
+  </Accordion>
+
+  <Accordion title="Before Upgrading SonarQube">
+    When upgrading SonarQube:
+    1. Check if a compatible plugin version exists for the target SonarQube version
+    2. Download the new plugin version
+    3. Plan to update both SonarQube and the plugin together
+    4. Test in a staging environment first
+    
+    <Warning>
+    Never upgrade SonarQube without upgrading the plugin to a matching version.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Version Check During Installation
+
+The plugin performs version compatibility checks during installation. If you attempt to use an incompatible version, you may encounter:
+
+- **Startup failures** - SonarQube may fail to start or load the plugin
+- **Runtime errors** - Features may not work correctly
+- **API incompatibilities** - Scanner integration may fail
+
+<Card title="Best Practice" icon="lightbulb">
+  Always read the installation instructions from the README on the specific release tag you're installing, as installation steps may vary between versions.
+</Card>
+
+## Migration Considerations
+
+<Warning>
+**Commercial Edition Migration:**
+
+This plugin is **not officially supported** by SonarSource. If you plan to migrate from SonarQube Community Edition to a Commercial Edition (Developer, Enterprise, or Data Center) after using this plugin:
+
+- There is **no official upgrade path**
+- Data migration compatibility is **untested**
+- You may experience **data loss** during migration
+- Compatibility between this plugin and official SonarQube branch features is not guaranteed
+</Warning>
+
+## Getting Support
+
+Support for compatibility issues is available through:
+
+- [GitHub Issues](https://github.com/mc1arke/sonarqube-community-branch-plugin/issues) - For bug reports and feature requests
+- [Stack Overflow](https://stackoverflow.com/questions/tagged/sonarqube) - For general questions (tag: `sonarqube`)
+
+<Note>
+Support requests sent directly to SonarSource or the Sonar Community forum are likely to be closed or ignored, as this is a community-maintained plugin.
+</Note>

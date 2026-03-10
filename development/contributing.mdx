@@ -1,0 +1,361 @@
+---
+title: Contributing
+description: Guidelines for contributing to the SonarQube Community Branch Plugin
+---
+
+## Getting Started
+
+Contributions to the SonarQube Community Branch Plugin are welcome! This plugin enables branch and pull request analysis in SonarQube Community Edition through bytecode manipulation.
+
+<Note>
+  This is an **unofficial plugin** not supported by SonarSource. Contributions should focus on maintaining compatibility with SonarQube Community Edition.
+</Note>
+
+## Development Workflow
+
+### Prerequisites
+
+Ensure you have the required tools installed:
+
+- **Java 17+** (Java 21 recommended for testing)
+- **Gradle** (wrapper included)
+- **Node.js 22** and **Yarn** (for frontend)
+- **Git** with submodules support
+- **Docker** and **Docker Compose** (optional, for testing)
+
+### Setting Up Your Environment
+
+<Steps>
+  <Step title="Fork and clone the repository">
+    ```bash
+    git clone --recurse-submodules https://github.com/YOUR-USERNAME/sonarqube-community-branch-plugin.git
+    cd sonarqube-community-branch-plugin
+    ```
+  </Step>
+
+  <Step title="Build the project">
+    ```bash
+    ./gradlew clean build
+    ```
+    This will download SonarQube libraries on first run (may take several minutes).
+  </Step>
+
+  <Step title="Run tests">
+    ```bash
+    ./gradlew test
+    ```
+  </Step>
+
+  <Step title="Start a local SonarQube instance (optional)">
+    ```bash
+    docker compose up --build
+    ```
+    Access SonarQube at http://localhost:9000 (default credentials: admin/admin)
+  </Step>
+</Steps>
+
+## Making Changes
+
+### Code Style
+
+- **Java**: Follow standard Java conventions
+  - Use meaningful variable and method names
+  - Add JavaDoc comments for public APIs
+  - Keep methods focused and concise
+- **TypeScript/React**: Follow the existing style in the web frontend
+- **Encoding**: All source files must use UTF-8 encoding
+
+### Testing Requirements
+
+<Warning>
+  All contributions **must** include tests. PRs without tests will not be merged.
+</Warning>
+
+#### Unit Tests
+
+The plugin uses **JUnit 5** with **Mockito** and **AssertJ**:
+
+```java
+@Test
+void testBranchConfiguration() {
+    BranchConfigurationFactory factory = new BranchConfigurationFactory();
+    ProjectBranches branches = mock(ProjectBranches.class);
+    
+    BranchConfiguration config = factory.createBranchConfiguration("feature/test", branches);
+    
+    assertThat(config.branchName()).isEqualTo("feature/test");
+    assertThat(config.branchType()).isEqualTo(BranchType.BRANCH);
+}
+```
+
+#### Integration Tests
+
+For ALM integrations, use **WireMock** to mock HTTP endpoints:
+
+```java
+@Test
+void testGitHubPRDecoration() {
+    wireMockRule.stubFor(post(urlEqualTo("/repos/owner/repo/issues/1/comments"))
+        .willReturn(aResponse().withStatus(201)));
+    
+    decorator.decoratePullRequest(analysisDetails);
+    
+    verify(postRequestedFor(urlEqualTo("/repos/owner/repo/issues/1/comments")));
+}
+```
+
+#### Running Tests
+
+```bash
+# Run all tests
+./gradlew test
+
+# Run with coverage
+./gradlew test jacocoTestReport
+
+# View coverage report
+open build/reports/jacoco/test/html/index.html
+
+# Run mutation testing (optional)
+./gradlew pitest
+```
+
+### Code Coverage
+
+The project uses **JaCoCo** for code coverage. Aim for:
+
+- **Minimum 80%** line coverage for new code
+- **100% coverage** for critical paths (Java agent, bytecode manipulation)
+
+### Continuous Integration
+
+All pull requests are automatically tested via **GitHub Actions**:
+
+- ✅ Build on Java 21
+- ✅ Run all unit and integration tests
+- ✅ Code analysis on SonarCloud
+- ✅ Frontend build verification
+
+## Pull Request Process
+
+<Steps>
+  <Step title="Create a feature branch">
+    ```bash
+    git checkout -b feature/my-improvement
+    ```
+    Use descriptive branch names like `feature/gitlab-support` or `fix/pr-decoration-bug`.
+  </Step>
+
+  <Step title="Make your changes">
+    - Write clean, tested code
+    - Follow existing code patterns
+    - Update documentation if needed
+  </Step>
+
+  <Step title="Commit your changes">
+    ```bash
+    git add .
+    git commit -m "Add support for GitLab group-level tokens"
+    ```
+    Use clear, descriptive commit messages in imperative mood.
+  </Step>
+
+  <Step title="Push and create PR">
+    ```bash
+    git push origin feature/my-improvement
+    ```
+    Then create a pull request on GitHub with:
+    - Clear description of the change
+    - Reference to related issues
+    - Screenshots (if UI changes)
+  </Step>
+
+  <Step title="Address review feedback">
+    Respond to code review comments and make requested changes.
+  </Step>
+</Steps>
+
+## Contribution Areas
+
+### 🔧 Core Plugin Development
+
+- **Java agent enhancements** - Improve bytecode manipulation reliability
+- **Scanner improvements** - Better branch/PR detection
+- **Compute Engine optimizations** - Faster analysis processing
+
+### 🎨 Frontend Development
+
+The frontend is in the `sonarqube-webapp` submodule with custom additions:
+
+```bash
+cd sonarqube-webapp
+yarn install --no-immutable
+yarn nx run sq-server:build
+```
+
+Contribute:
+- UI improvements for branch management
+- Pull request list enhancements
+- Branch comparison views
+
+### 🔌 ALM Integrations
+
+Supported platforms:
+- **GitHub** - Issues, checks, PR comments
+- **GitLab** - Merge request discussions
+- **Bitbucket** - Cloud and Server
+- **Azure DevOps** - Pull request threads
+
+Contribute:
+- New ALM platform support
+- Enhanced decoration features
+- Better error handling
+
+### 📚 Documentation
+
+Help improve:
+- Installation guides
+- Configuration examples
+- Troubleshooting guides
+- Architecture documentation
+
+## Version Compatibility
+
+<Info>
+  The plugin major and minor versions match the SonarQube version it supports.
+</Info>
+
+- Plugin `26.2.x` → SonarQube `26.2.x`
+- Plugin `25.4.x` → SonarQube `25.4.x`
+
+When contributing:
+- Test against the target SonarQube version
+- Update the `sonarqubeVersion` in `build.gradle`
+- Verify compatibility with bytecode changes
+
+## Debugging Tips
+
+### Enable Debug Logging
+
+Add to `sonar.properties`:
+
+```properties
+sonar.log.level=DEBUG
+sonar.log.level.web=DEBUG
+sonar.log.level.ce=DEBUG
+```
+
+### Debug Java Agent
+
+Set breakpoints in `CommunityBranchAgent.premain()` and attach a debugger:
+
+```bash
+sonar.web.javaAdditionalOpts=-javaagent:./extensions/plugins/sonarqube-community-branch-plugin.jar=web -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005
+```
+
+### Inspect Bytecode Transformations
+
+Add this to the agent to dump transformed classes:
+
+```java
+Files.write(Paths.get("/tmp/" + className + ".class"), byteCode);
+```
+
+### Test with Different SonarQube Versions
+
+Update `build.gradle`:
+
+```gradle
+def sonarqubeVersion = '26.2.0.119303'
+```
+
+Then rebuild:
+
+```bash
+rm -rf sonarqube-lib/
+./gradlew clean build
+```
+
+## Release Process
+
+<Note>
+  Only maintainers can create releases.
+</Note>
+
+The release process is automated via GitHub Actions:
+
+1. Update `version` in `gradle.properties` to a release version (e.g., `26.2.0`)
+2. Commit and push to `master`
+3. GitHub Actions will:
+   - Build the plugin JAR
+   - Build the frontend webapp
+   - Create a draft GitHub release
+   - Upload artifacts
+4. Review and publish the draft release
+
+## Getting Help
+
+### Support Channels
+
+<Warning>
+  **Do not** request support from SonarSource or the Sonar Community forum. They do not support this plugin.
+</Warning>
+
+- **GitHub Issues**: https://github.com/mc1arke/sonarqube-community-branch-plugin/issues
+- **StackOverflow**: Tag questions with `sonarqube` and `community-branch-plugin`
+- **Discussions**: Use GitHub Discussions for questions and ideas
+
+### Common Issues
+
+**Build fails with "SonarQube libraries not found"**
+
+Solution:
+```bash
+rm -rf sonarqube-lib/
+./gradlew clean build
+```
+
+**Frontend build fails**
+
+Solution:
+```bash
+cd sonarqube-webapp
+rm -rf node_modules
+yarn cache clean
+yarn install --no-immutable
+```
+
+**Tests fail with class loading errors**
+
+Solution: Ensure you're using the correct Java version:
+```bash
+java -version  # Should be 17+
+```
+
+## Code of Conduct
+
+Be respectful and constructive:
+
+- ✅ Focus on the code, not the person
+- ✅ Provide helpful, actionable feedback
+- ✅ Be patient with new contributors
+- ❌ No harassment or discrimination
+- ❌ No spam or off-topic discussions
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the **GNU Lesser General Public License v3.0** (LGPL-3.0).
+
+All contributions must:
+- Include the LGPL-3.0 license header in new files
+- Not introduce dependencies with incompatible licenses
+- Respect the copyright of Michael Clarke and other contributors
+
+## Recognition
+
+Contributors are recognized in:
+- GitHub's contributor graph
+- Release notes for significant contributions
+- The project README (for major features)
+
+Thank you for contributing to the SonarQube Community Branch Plugin!

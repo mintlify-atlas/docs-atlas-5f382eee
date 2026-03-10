@@ -1,0 +1,272 @@
+---
+title: Azure DevOps Integration
+description: Configure Azure DevOps pull request decoration with comment threads, pull request status, and inline annotations
+---
+
+The Azure DevOps integration provides comprehensive pull request decoration using Azure DevOps REST API, including inline comment threads, pull request status checks, and discussion management.
+
+## Features
+
+The Azure DevOps integration provides:
+
+- **Pull Request Status**: Sets PR status with quality gate results
+- **Comment Threads**: Creates threaded comments on specific lines of changed code
+- **Summary Thread**: Posts a summary comment with overall analysis results
+- **Thread Management**: Automatically resolves/unresolves threads based on issue status
+- **Inline Annotations**: Optional inline code annotations (enabled by default)
+- **Monorepo Support**: Separate status checks for each project in a monorepo
+
+### Pull Request Status Details
+
+The pull request status includes:
+- Description: "SonarQube Quality Gate - \{project name\} (\{project key\})"
+- Context name: `sonarqube/qualitygate`
+- Context genre: Project key (for identifying the specific project)
+- State: SUCCEEDED or FAILED based on quality gate
+- Target URL: Link to the SonarQube dashboard
+
+### Comment Thread Types
+
+1. **Inline Comment Threads**: Created on specific lines where issues are detected (optional)
+2. **Summary Thread**: Created at the pull request level with overall results
+3. Threads are automatically resolved when the quality gate passes
+4. Thread status options: ACTIVE, CLOSED
+
+## Authentication
+
+Azure DevOps integration uses **Personal Access Tokens (PAT)** for authentication.
+
+### Token Requirements
+
+Your token must have the following scopes:
+- **Code**: Read & Write (required for accessing repositories and creating comments)
+- **Pull Request Threads**: Read & Write
+
+### Creating a Personal Access Token
+
+<Steps>
+  <Step title="Navigate to User Settings">
+    In Azure DevOps, click your profile icon → **Personal access tokens**
+  </Step>
+  
+  <Step title="Create Token">
+    Click "New Token" and provide:
+    - **Name**: A descriptive name (e.g., "SonarQube Integration")
+    - **Organization**: Select your organization or "All accessible organizations"
+    - **Expiration**: Set an expiration date (90 days recommended)
+    - **Scopes**: Select "Custom defined"
+  </Step>
+  
+  <Step title="Configure Scopes">
+    Expand "Code" and select:
+    - **Read**: ✓
+    - **Write**: ✓ (may also require "Status")
+  </Step>
+  
+  <Step title="Save Token">
+    Click "Create" and copy the token immediately - it won't be shown again
+  </Step>
+</Steps>
+
+## Configuration
+
+### Global Configuration
+
+Configure the Azure DevOps connection in SonarQube:
+
+<Steps>
+  <Step title="Navigate to Administration">
+    Go to **Administration** → **Configuration** → **General Settings** → **ALM Integrations** → **Azure DevOps**
+  </Step>
+  
+  <Step title="Add Azure DevOps Configuration">
+    Click "Create configuration" and provide:
+    - **Configuration Name**: A unique identifier for this connection
+    - **Azure DevOps URL**: 
+      - For Azure DevOps Services: `https://dev.azure.com/{organization}`
+      - For Azure DevOps Server: `https://your-server.com/{collection}`
+    - **Personal Access Token**: The token created in the previous step
+  </Step>
+</Steps>
+
+### Project Configuration
+
+Bind each SonarQube project to an Azure DevOps repository:
+
+<Steps>
+  <Step title="Navigate to Project Settings">
+    Go to your project → **Administration** → **General Settings** → **Pull Request Decoration**
+  </Step>
+  
+  <Step title="Configure Project Binding">
+    Provide:
+    - **Configuration name**: Select the Azure DevOps configuration created above
+    - **Project name**: The Azure DevOps project name (required)
+    - **Repository name**: The repository name within the project (required)
+  </Step>
+  
+  <Step title="Optional Settings">
+    - **Inline Annotations Enabled**: Enable/disable inline comment threads (default: enabled)
+    - **Monorepo**: Enable if this project is part of a monorepo
+  </Step>
+</Steps>
+
+<Note>
+  Both **Project name** and **Repository name** are required for Azure DevOps. The project name is the Azure DevOps project (workspace), and the repository name is the Git repository within that project.
+</Note>
+
+## Scanner Configuration
+
+When running analysis on a pull request, provide these parameters:
+
+```bash
+sonar-scanner \
+  -Dsonar.pullrequest.key=123 \
+  -Dsonar.pullrequest.branch=feature-branch \
+  -Dsonar.pullrequest.base=main
+```
+
+### Required Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|----------|
+| `sonar.pullrequest.key` | Pull request ID | `123` |
+| `sonar.pullrequest.branch` | Source branch name | `feature-branch` |
+| `sonar.pullrequest.base` | Target branch name | `main` |
+
+## Comment Thread Management
+
+The Azure DevOps decorator intelligently manages comment threads on pull requests:
+
+### Creating Comment Threads
+
+- **Inline threads** are created for each issue found on changed lines (if enabled)
+- Each thread includes:
+  - Issue description and severity
+  - Link to the issue in SonarQube
+  - Thread context with file path and line position
+  - Status: ACTIVE
+
+### Thread Context Details
+
+Inline threads include precise position information:
+- **File path**: Relative path from repository root (prefixed with `/`)
+- **Right file position**: Start line and offset in the changed file
+- **Left file position**: End line and offset for multi-line issues
+
+### Updating Comment Threads
+
+- Existing threads are updated when issues change
+- New comments are added to threads for status updates
+- Threads are resolved (status: CLOSED) when:
+  - The associated issue is fixed
+  - The quality gate passes (for the summary thread)
+
+### Deleting Comment Threads
+
+- Old threads are deleted by removing all comments in the thread
+- The plugin tracks threads by parsing issue URLs from previous comments
+- Only threads created by the authenticated user are modified
+
+## Inline Annotations Control
+
+The `inlineAnnotationsEnabled` setting (default: `true`) controls whether inline comment threads are created.
+
+### When Enabled (Default)
+- Issues are posted as inline comment threads on specific lines
+- Provides detailed, contextual feedback directly in the code review
+
+### When Disabled
+- Only the summary thread is created
+- Useful for reducing noise in the pull request
+- All issue details are still available in the SonarQube dashboard
+
+## Monorepo Support
+
+For monorepo setups:
+
+1. Enable the **Monorepo** option in project settings
+2. Each project creates a separate pull request status
+3. Status checks are identified by the project key in the context
+4. This allows multiple SonarQube projects to decorate the same PR without conflicts
+
+## Implementation Details
+
+The Azure DevOps decorator is implemented in:
+- `AzureDevOpsPullRequestDecorator` (src/main/java/com/github/mc1arke/sonarqube/plugin/ce/pullrequest/azuredevops/)
+- `AzureDevopsRestClient` (src/main/java/com/github/mc1arke/sonarqube/plugin/almclient/azuredevops/)
+
+### Key Behaviors
+
+- Uses Azure DevOps REST API version 4.1 (with preview features)
+- Authenticates using Basic authentication with the PAT
+- Creates comment threads with precise line positions
+- Maps SonarQube quality gate status to Azure DevOps GitStatusState
+- Automatically resolves threads when quality gate passes
+- Deletes comments to remove threads (Azure DevOps doesn't support direct thread deletion)
+
+### API Endpoints Used
+
+- `GET /{project}/_apis/git/repositories/{repo}/pullRequests/{id}` - Get PR details
+- `GET /{project}/_apis/git/repositories/{repo}/pullRequests/{id}/commits` - Get PR commits
+- `GET /{project}/_apis/git/repositories/{repo}/pullRequests/{id}/threads` - Get comment threads
+- `POST /{project}/_apis/git/repositories/{repo}/pullRequests/{id}/threads` - Create thread
+- `POST /{project}/_apis/git/repositories/{repo}/pullRequests/{id}/threads/{threadId}/comments` - Add comment
+- `PATCH /{project}/_apis/git/repositories/{repo}/pullRequests/{id}/threads/{threadId}` - Update thread status
+- `DELETE /{project}/_apis/git/repositories/{repo}/pullRequests/{id}/threads/{threadId}/comments/{commentId}` - Delete comment
+- `POST /{project}/_apis/git/repositories/{repo}/pullRequests/{id}/statuses` - Create PR status
+- `GET /_apis/ConnectionData` - Get authenticated user information
+
+### Status State Mapping
+
+| SonarQube Quality Gate | Azure DevOps GitStatusState |
+|------------------------|----------------------------|
+| OK | SUCCEEDED |
+| ERROR | FAILED |
+
+## Troubleshooting
+
+### API URL Format
+
+Ensure your Azure DevOps URL is formatted correctly:
+
+**Azure DevOps Services (cloud)**:
+- ✅ `https://dev.azure.com/organization-name`
+- ❌ `https://organization-name.visualstudio.com` (legacy format, may work but not recommended)
+
+**Azure DevOps Server (on-premises)**:
+- ✅ `https://tfs.company.com/DefaultCollection`
+- ✅ `https://azuredevops.company.com/Collection`
+
+### Project and Repository Names
+
+Both are required and case-sensitive:
+- Project name: The name shown in Azure DevOps (not the URL slug)
+- Repository name: The exact repository name (not the URL slug)
+
+If you're unsure, check the Azure DevOps UI - the names are shown in the repository breadcrumb.
+
+### Token Permissions
+
+If threads or status are not appearing:
+1. Verify the token has "Code (Read & Write)" permissions
+2. Ensure the token hasn't expired
+3. Check that the token's organization scope includes your organization
+
+### Pull Request ID
+
+Use the numeric pull request ID shown in Azure DevOps:
+- ✅ `123` (from "Pull Request 123")
+- ❌ Don't use the internal database ID or other identifiers
+
+### Thread Position Errors
+
+If inline comments fail to appear:
+- Ensure inline annotations are enabled in project settings
+- Verify the analysis includes SCM information
+- Check that file paths match between Azure DevOps and SonarQube
+- Ensure line numbers are within the valid range
+
+### Legacy Issue URL Parsing
+
+The plugin supports parsing legacy issue URLs from previous versions. If you're upgrading from an older version, existing threads will still be recognized and managed correctly.

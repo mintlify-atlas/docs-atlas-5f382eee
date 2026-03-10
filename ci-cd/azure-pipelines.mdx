@@ -1,0 +1,379 @@
+---
+title: Azure Pipelines
+description: Configure SonarQube analysis in Azure DevOps Pipelines
+---
+
+## Auto-Configuration
+
+The plugin automatically detects Azure Pipelines environments and configures pull request analysis without manual property configuration.
+
+### Detection
+
+The auto-configurer activates when:
+
+- `TF_BUILD=true` is set in the environment
+
+### Environment Variables Used
+
+| Variable | Purpose | Example |
+|----------|---------|----------|
+| `TF_BUILD` | Detects Azure Pipelines environment | `true` |
+| `SYSTEM_PULLREQUEST_PULLREQUESTID` | Pull request ID | `123` |
+| `SYSTEM_PULLREQUEST_SOURCEBRANCH` | PR source branch | `refs/heads/feature/add-feature` |
+| `SYSTEM_PULLREQUEST_TARGETBRANCH` | PR target branch | `refs/heads/main` |
+
+## Configuration Behavior
+
+### Pull Request Detection
+
+The plugin detects pull requests when:
+
+- `SYSTEM_PULLREQUEST_PULLREQUESTID` is not null
+
+**Automatically configured properties:**
+
+- `sonar.pullrequest.key` - Set to `SYSTEM_PULLREQUEST_PULLREQUESTID`
+- `sonar.pullrequest.branch` - Set to `SYSTEM_PULLREQUEST_SOURCEBRANCH`
+- `sonar.pullrequest.base` - Set to `SYSTEM_PULLREQUEST_TARGETBRANCH`
+
+<Warning>
+**Branch Analysis Not Auto-Configured**
+
+The Azure DevOps auto-configurer only supports pull request analysis. For branch builds, you must manually configure `sonar.branch.name`.
+</Warning>
+
+## Usage Examples
+
+<CodeGroup>
+
+```yaml Classic Pipeline (YAML)
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: sonarqube-credentials
+
+steps:
+  - task: SonarQubePrepare@6
+    inputs:
+      SonarQube: 'SonarQube-Connection'
+      scannerMode: 'CLI'
+      configMode: 'file'
+
+  - task: Maven@3
+    inputs:
+      mavenPomFile: 'pom.xml'
+      goals: 'clean verify'
+      publishJUnitResults: true
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+
+  - task: SonarQubeAnalyze@6
+    displayName: 'Run SonarQube Analysis'
+
+  - task: SonarQubePublish@6
+    inputs:
+      pollingTimeoutSec: '300'
+```
+
+```yaml Maven Project
+trigger:
+  - main
+  - develop
+
+pr:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: sonarqube-credentials
+
+steps:
+  - task: Maven@3
+    displayName: 'Maven Build and SonarQube Analysis'
+    inputs:
+      mavenPomFile: 'pom.xml'
+      goals: 'clean verify sonar:sonar'
+      options: '-Dsonar.host.url=$(SONAR_HOST_URL) -Dsonar.token=$(SONAR_TOKEN)'
+      publishJUnitResults: true
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '17'
+```
+
+```yaml Gradle Project
+trigger:
+  - main
+  - develop
+
+pr:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: sonarqube-credentials
+
+steps:
+  - task: Gradle@3
+    displayName: 'Gradle Build and SonarQube Analysis'
+    inputs:
+      gradleWrapperFile: 'gradlew'
+      tasks: 'build sonar'
+      options: '-Dsonar.host.url=$(SONAR_HOST_URL) -Dsonar.token=$(SONAR_TOKEN)'
+      publishJUnitResults: true
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '17'
+```
+
+```yaml .NET Project
+trigger:
+  - main
+  - develop
+
+pr:
+  - main
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  - group: sonarqube-credentials
+
+steps:
+  - task: SonarQubePrepare@6
+    inputs:
+      SonarQube: 'SonarQube-Connection'
+      scannerMode: 'MSBuild'
+      projectKey: 'my-dotnet-project'
+      projectName: 'My .NET Project'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: '**/*.csproj'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    inputs:
+      command: 'test'
+      projects: '**/*Tests.csproj'
+      arguments: '--collect:"Code Coverage"'
+
+  - task: SonarQubeAnalyze@6
+    displayName: 'Run SonarQube Analysis'
+
+  - task: SonarQubePublish@6
+    inputs:
+      pollingTimeoutSec: '300'
+```
+
+```yaml Node.js Project
+trigger:
+  - main
+  - develop
+
+pr:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: sonarqube-credentials
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '20.x'
+    displayName: 'Install Node.js'
+
+  - script: |
+      npm ci
+      npm test -- --coverage
+    displayName: 'Install dependencies and run tests'
+
+  - task: SonarQubePrepare@6
+    inputs:
+      SonarQube: 'SonarQube-Connection'
+      scannerMode: 'CLI'
+      configMode: 'file'
+
+  - task: SonarQubeAnalyze@6
+    displayName: 'Run SonarQube Analysis'
+
+  - task: SonarQubePublish@6
+    inputs:
+      pollingTimeoutSec: '300'
+```
+
+</CodeGroup>
+
+## Service Connection Setup
+
+1. In Azure DevOps, navigate to **Project Settings > Service connections**
+2. Click **New service connection**
+3. Select **SonarQube**
+4. Enter your SonarQube server URL and authentication token
+5. Name the connection (e.g., `SonarQube-Connection`)
+6. Save the connection
+
+## Variable Groups
+
+Create a variable group for SonarQube credentials:
+
+1. Navigate to **Pipelines > Library**
+2. Click **+ Variable group**
+3. Name it `sonarqube-credentials`
+4. Add variables:
+   - `SONAR_HOST_URL` - Your SonarQube server URL
+   - `SONAR_TOKEN` - Your SonarQube token (mark as secret)
+
+## Branch Analysis Configuration
+
+For branch builds, manually configure the branch name:
+
+```yaml
+steps:
+  - task: SonarQubePrepare@6
+    inputs:
+      SonarQube: 'SonarQube-Connection'
+      scannerMode: 'CLI'
+      configMode: 'manual'
+      extraProperties: |
+        sonar.branch.name=$(Build.SourceBranchName)
+```
+
+Or with Maven/Gradle:
+
+```yaml
+- task: Maven@3
+  inputs:
+    goals: 'clean verify sonar:sonar'
+    options: '-Dsonar.branch.name=$(Build.SourceBranchName)'
+```
+
+## Quality Gate Integration
+
+Block the pipeline if quality gate fails:
+
+```yaml
+- task: SonarQubePublish@6
+  inputs:
+    pollingTimeoutSec: '300'
+
+- task: sonar-buildbreaker@8
+  inputs:
+    SonarQube: 'SonarQube-Connection'
+```
+
+## Multi-Stage Pipeline
+
+```yaml
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildJob
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: Maven@3
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'clean package'
+
+  - stage: Quality
+    dependsOn: Build
+    jobs:
+      - job: SonarQubeAnalysis
+        pool:
+          vmImage: 'ubuntu-latest'
+        variables:
+          - group: sonarqube-credentials
+        steps:
+          - task: SonarQubePrepare@6
+            inputs:
+              SonarQube: 'SonarQube-Connection'
+              scannerMode: 'CLI'
+
+          - task: SonarQubeAnalyze@6
+
+          - task: SonarQubePublish@6
+            inputs:
+              pollingTimeoutSec: '300'
+```
+
+## Manual Override
+
+If you need to override the auto-detected values:
+
+```yaml
+- task: SonarQubePrepare@6
+  inputs:
+    SonarQube: 'SonarQube-Connection'
+    scannerMode: 'CLI'
+    configMode: 'manual'
+    extraProperties: |
+      sonar.pullrequest.key=$(System.PullRequest.PullRequestId)
+      sonar.pullrequest.branch=$(System.PullRequest.SourceBranch)
+      sonar.pullrequest.base=$(System.PullRequest.TargetBranch)
+```
+
+## Important Notes
+
+<Info>
+**Extension Required**
+
+Install the [SonarQube extension](https://marketplace.visualstudio.com/items?itemName=SonarSource.sonarqube) from the Azure DevOps marketplace.
+</Info>
+
+<Warning>
+**Pull Request Triggers**
+
+Ensure your pipeline has `pr:` triggers configured to run on pull requests.
+</Warning>
+
+## Troubleshooting
+
+### PR Decoration Not Working
+
+1. Verify Azure DevOps integration is configured in SonarQube
+2. Check service connection permissions
+3. Ensure `sonar.core.serverBaseURL` is set in SonarQube settings
+4. Verify the PAT token has appropriate permissions
+
+### Environment Variables Not Set
+
+Pull request variables are only available in PR builds. Debug with:
+
+```yaml
+- script: |
+    echo "TF_BUILD=$TF_BUILD"
+    echo "SYSTEM_PULLREQUEST_PULLREQUESTID=$(System.PullRequest.PullRequestId)"
+    echo "SYSTEM_PULLREQUEST_SOURCEBRANCH=$(System.PullRequest.SourceBranch)"
+    echo "SYSTEM_PULLREQUEST_TARGETBRANCH=$(System.PullRequest.TargetBranch)"
+  displayName: 'Debug Environment Variables'
+```
+
+### Branch Name Issues
+
+The source/target branch variables include `refs/heads/` prefix. If needed, strip it:
+
+```yaml
+extraProperties: |
+  sonar.pullrequest.branch=$(System.PullRequest.SourceBranch:refs/heads/=)
+  sonar.pullrequest.base=$(System.PullRequest.TargetBranch:refs/heads/=)
+```

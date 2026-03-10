@@ -1,0 +1,471 @@
+---
+title: Features Overview
+description: Comprehensive guide to the features, capabilities, and supported parameters of the SonarQube Community Branch Plugin
+---
+
+## Overview
+
+The SonarQube Community Branch Plugin brings branch analysis and pull request decoration capabilities to the SonarQube Community Edition. It implements features that are normally only available in SonarQube's commercial editions.
+
+<Note>
+This plugin is designed to support the features and parameters documented in the official SonarQube [branch analysis](https://docs.sonarsource.com/sonarqube-server/latest/analyzing-source-code/branch-analysis/introduction/) and [pull request analysis](https://docs.sonarsource.com/sonarqube-server/latest/analyzing-source-code/pull-request-analysis/introduction/) documentation.
+</Note>
+
+## Core Features
+
+<CardGroup cols={2}>
+  <Card title="Branch Analysis" icon="code-branch">
+    Analyze multiple branches of your codebase and track quality metrics independently for each branch.
+  </Card>
+  <Card title="Pull Request Decoration" icon="code-pull-request">
+    Automatically decorate pull requests with quality gate status, code coverage, and issue comments.
+  </Card>
+  <Card title="Multi-Platform Support" icon="cloud">
+    Integrates with GitHub, GitLab, Bitbucket, and Azure DevOps for seamless PR decoration.
+  </Card>
+  <Card title="CI Auto-Configuration" icon="robot">
+    Automatic detection and configuration for popular CI/CD platforms.
+  </Card>
+</CardGroup>
+
+## Branch Analysis
+
+### Basic Branch Analysis
+
+Analyze any branch in your repository with full quality metrics tracking:
+
+```bash
+sonar-scanner \
+  -Dsonar.branch.name=feature/my-feature
+```
+
+<AccordionGroup>
+  <Accordion title="Supported Parameters">
+    | Parameter | Description | Required |
+    |-----------|-------------|----------|
+    | `sonar.branch.name` | Name of the branch being analyzed | Yes |
+    | `sonar.branch.target` | Target branch for comparison (optional) | No |
+  </Accordion>
+
+  <Accordion title="Branch Configuration Details">
+    The plugin implements `CommunityBranchConfigurationLoader` which:
+    - Loads branch configuration from scanner properties
+    - Validates branch parameters
+    - Supports auto-configuration from CI environment variables
+    - Creates branch-specific analysis contexts
+    
+    Source reference: `CommunityBranchConfigurationLoader.java:67-111`
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+**Important:** Do not set `sonar.branch.name` when analyzing a pull request. Branch and pull request parameters cannot be used together in the same scan.
+</Warning>
+
+## Pull Request Analysis
+
+### Required Parameters
+
+To analyze and decorate pull requests, provide these scanner properties:
+
+```bash
+sonar-scanner \
+  -Dsonar.pullrequest.key=123 \
+  -Dsonar.pullrequest.branch=feature/my-feature \
+  -Dsonar.pullrequest.base=main
+```
+
+<CardGroup cols={3}>
+  <Card title="pullrequest.key" icon="key">
+    The pull request ID or number (e.g., `100`)
+  </Card>
+  <Card title="pullrequest.branch" icon="code-branch">
+    The source branch name (e.g., `feature/TICKET-123`)
+  </Card>
+  <Card title="pullrequest.base" icon="code-merge">
+    The target branch name (e.g., `main` or `master`)
+  </Card>
+</CardGroup>
+
+### Platform-Specific Parameters
+
+<Accordion title="GitHub Pull Requests">
+  When scanning GitHub pull requests, you must also provide the commit SHA:
+
+  ```yaml
+  - name: SonarQube Scan
+    uses: sonarsource/sonarqube-scan-action@<version>
+    with:
+      args: >
+        -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+  ```
+
+  **Why?** GitHub requires the exact commit SHA for status checks and PR decorations.
+</Accordion>
+
+<Accordion title="GitLab Merge Requests">
+  GitLab merge requests support additional configuration:
+
+  | Parameter | Description | Default |
+  |-----------|-------------|--------|
+  | `sonar.pullrequest.gitlab.projectUrl` | Override the merge request URL | Auto-detected from MR |
+  | `com.github.mc1arke.sonarqube.plugin.branch.pullrequest.gitlab.pipelineId` | Associate with a specific pipeline | None |
+
+  ```bash
+  sonar-scanner \
+    -Dsonar.pullrequest.key=42 \
+    -Dsonar.pullrequest.branch=feature-branch \
+    -Dsonar.pullrequest.base=main \
+    -Dsonar.pullrequest.gitlab.projectUrl=https://gitlab.com/org/project
+  ```
+
+  Source reference: `GitlabMergeRequestDecorator.java:51-53`
+</Accordion>
+
+## Supported ALM Platforms
+
+The plugin provides full integration with multiple Application Lifecycle Management platforms:
+
+<CardGroup cols={2}>
+  <Card title="GitHub" icon="github">
+    - Pull request decoration
+    - Status checks
+    - Inline issue comments
+    - Auto-configuration support
+  </Card>
+  <Card title="GitLab" icon="gitlab">
+    - Merge request decoration
+    - Pipeline status updates
+    - Discussion threads
+    - Inline comments
+  </Card>
+  <Card title="Bitbucket" icon="bitbucket">
+    - Pull request decoration
+    - Build status
+    - Inline comments
+    - Both Server and Cloud support
+  </Card>
+  <Card title="Azure DevOps" icon="microsoft">
+    - Pull request decoration
+    - Build status
+    - Comment threads
+    - Auto-configuration support
+  </Card>
+</CardGroup>
+
+### Platform Implementation Details
+
+Each platform has a dedicated decorator implementation:
+
+- **GithubPullRequestDecorator** - GitHub integration via GitHub API
+- **GitlabMergeRequestDecorator** - GitLab integration with discussion management
+- **BitbucketPullRequestDecorator** - Bitbucket Server and Cloud support
+- **AzureDevOpsPullRequestDecorator** - Azure DevOps integration
+
+Source reference: `CommunityBranchPlugin.java:97-106`
+
+## CI/CD Auto-Configuration
+
+The plugin automatically detects and configures branch/PR parameters when running in supported CI environments:
+
+<AccordionGroup>
+  <Accordion title="GitHub Actions">
+    **Auto-configured from environment:**
+    - `GITHUB_ACTIONS` - Enables detection
+    - `GITHUB_REF` - Determines branch or PR
+    - `GITHUB_HEAD_REF` - Source branch for PRs
+    - `GITHUB_BASE_REF` - Target branch for PRs
+    - `GITHUB_REF_NAME` - Branch name
+
+    **Implementation:** `GithubActionsAutoConfigurer`
+    
+    Automatically handles both push events (branches) and pull request events.
+    
+    Source reference: `GithubActionsAutoConfigurer.java:42-61`
+  </Accordion>
+
+  <Accordion title="GitLab CI">
+    **Auto-configured from environment:**
+    - GitLab CI environment variables
+    - Merge request detection
+    - Branch identification
+
+    **Implementation:** `GitlabCiAutoConfigurer`
+  </Accordion>
+
+  <Accordion title="Azure DevOps Pipelines">
+    **Auto-configured from environment:**
+    - Azure DevOps environment variables
+    - Pull request detection
+    - Branch tracking
+
+    **Implementation:** `AzureDevopsAutoConfigurer`
+  </Accordion>
+
+  <Accordion title="Bitbucket Pipelines">
+    **Auto-configured from environment:**
+    - Bitbucket Pipelines environment variables
+    - PR branch detection
+
+    **Implementation:** `BitbucketPipelinesAutoConfigurer`
+  </Accordion>
+
+  <Accordion title="Jenkins">
+    **Auto-configured from environment:**
+    - Jenkins environment variables
+    - Multi-branch pipeline support
+    - PR builder integration
+
+    **Implementation:** `JenkinsAutoConfigurer`
+  </Accordion>
+
+  <Accordion title="Cirrus CI">
+    **Implementation:** `CirrusCiAutoConfigurer`
+  </Accordion>
+
+  <Accordion title="Codemagic">
+    **Implementation:** `CodeMagicAutoConfigurer`
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+When auto-configuration is active, you don't need to manually specify `sonar.branch.name` or `sonar.pullrequest.*` parameters - the plugin will detect them automatically from your CI environment.
+</Note>
+
+## Pull Request Decoration Features
+
+### Quality Gate Status
+
+The plugin submits quality gate status to your ALM platform:
+
+- ✅ **Passed** - Quality gate conditions met
+- ❌ **Failed** - Quality gate conditions not met
+- 🔄 **Pending** - Analysis in progress
+
+### Inline Issue Comments
+
+For each detected issue, the plugin can add inline comments showing:
+
+- Issue severity and type
+- Issue message and description
+- Line-specific code location
+- Link to full details in SonarQube
+
+<Note>
+Inline comments are supported on all integrated ALM platforms and are managed through the `DiscussionAwarePullRequestDecorator` base class.
+</Note>
+
+### Summary Comments
+
+A summary comment is posted on each PR containing:
+
+- Quality gate status
+- New issues count by severity
+- Code coverage metrics
+- Technical debt metrics
+- Link to the full analysis dashboard
+
+Source reference: `GitlabMergeRequestDecorator.java:163-174`
+
+### Discussion Management
+
+The plugin intelligently manages PR discussions:
+
+- **Creates** new discussions for new issues
+- **Resolves** discussions when issues are fixed
+- **Updates** existing discussions when issues change
+- **Removes** outdated comments from previous analyses
+
+## Server-Side Features
+
+### Branch Housekeeping
+
+Automatically clean up inactive branches and pull requests:
+
+<CardGroup cols={2}>
+  <Card title="Inactive Branch Deletion" icon="trash">
+    **Property:** `sonar.dbcleaner.daysBeforeDeletingInactiveBranchesAndPRs`
+    
+    **Default:** 30 days
+    
+    **Description:** Branches and PRs are permanently deleted when there has been no analysis for the configured number of days.
+  </Card>
+  <Card title="Protected Branches" icon="shield">
+    **Property:** `sonar.dbcleaner.branchesToKeepWhenInactive`
+    
+    **Default:** `main,master,develop,trunk`
+    
+    **Description:** Branches matching these regex patterns are protected from automatic deletion.
+  </Card>
+</CardGroup>
+
+Source reference: `CommunityBranchPlugin.java:114-141`
+
+### Pull Request Management API
+
+The plugin provides REST API endpoints for managing pull requests:
+
+- **List Pull Requests** - `PullRequestWs/ListAction`
+- **Delete Pull Request** - `PullRequestWs/DeleteAction`
+
+Source reference: `CommunityBranchPlugin.java:93-95`
+
+### ALM Binding Configuration
+
+Manage ALM platform connections through dedicated actions:
+
+- `SetGithubBindingAction` - Configure GitHub integration
+- `SetGitlabBindingAction` - Configure GitLab integration
+- `SetBitbucketBindingAction` - Configure Bitbucket Server
+- `SetBitbucketCloudBindingAction` - Configure Bitbucket Cloud
+- `SetAzureBindingAction` - Configure Azure DevOps
+- `ValidateBindingAction` - Validate ALM connection
+- `DeleteBindingAction` - Remove ALM binding
+
+Source reference: `CommunityBranchPlugin.java:86-92`
+
+## Advanced Features
+
+### MonoRepo Support
+
+The plugin includes built-in monorepo feature support:
+
+```java
+public class MonoRepoFeature implements SonarQubeFeature {
+    @Override
+    public String getName() {
+        return "monorepo";
+    }
+}
+```
+
+<Note>
+Monorepo support allows multiple projects in a single repository to be analyzed independently while sharing the same ALM integration.
+</Note>
+
+Source reference: `MonoRepoFeature.java:27-38`
+
+### Custom Image URLs for PR Decoration
+
+By default, images for PR decoration are served from the SonarQube server. You can override this:
+
+**Property:** `com.github.mc1arke.sonarqube.plugin.branch.image-url-base`
+
+**Use case:** When your SonarQube server is behind a firewall and your ALM platform cannot access it.
+
+**Recommended value:** 
+```
+https://raw.githubusercontent.com/mc1arke/sonarqube-community-branch-plugin/master/src/main/resources/static
+```
+
+Or host the images yourself and point to your own URL.
+
+Source reference: `CommunityBranchPlugin.java:73, 148-156`
+
+## Validation
+
+### Branch Parameter Validation
+
+The plugin validates branch and PR parameters during scanning:
+
+- **Mutual exclusion** - Cannot specify both branch and PR parameters
+- **Required fields** - PR analysis requires key, branch, and base
+- **Format validation** - Ensures parameter values are valid
+
+Source reference: `CommunityBranchConfigurationLoader.java:77-79, 102-107`
+
+### ALM Configuration Validation
+
+Each ALM platform has a dedicated validator:
+
+- `GithubValidator` - Validates GitHub configuration
+- `GitlabValidator` - Validates GitLab configuration  
+- `BitbucketValidator` - Validates Bitbucket configuration
+- `AzureDevopsValidator` - Validates Azure DevOps configuration
+
+Source reference: `CommunityBranchPlugin.java:97-106`
+
+## Web Services API
+
+The plugin exposes several web service endpoints:
+
+### Pull Request Web Services
+
+- **PullRequestWs** - Main PR management API
+  - List pull requests for a project
+  - Delete pull request data
+
+### Support Web Services
+
+- **SupportWs** - Plugin support information
+  - `InfoWsAction` - Get plugin version and capabilities
+
+Source reference: `CommunityBranchPlugin.java:95, 108-109`
+
+## Component Architecture
+
+### Scanner-Side Components
+
+Components running during code analysis:
+
+- `CommunityProjectBranchesLoader` - Loads existing branch information
+- `CommunityBranchConfigurationLoader` - Configures branch/PR analysis
+- `CommunityBranchParamsValidator` - Validates parameters
+- `ScannerPullRequestPropertySensor` - Collects PR properties
+- `BranchConfigurationFactory` - Creates branch configurations
+
+Source reference: `CommunityBranchPlugin.java:164-170`
+
+### Server-Side Components
+
+Components running on the SonarQube server:
+
+- `CommunityBranchFeatureExtension` - Enables branch features
+- `CommunityBranchSupportDelegate` - Core branch support
+- ALM client factories (GitHub, GitLab, Bitbucket, Azure DevOps)
+- Platform validators and decorators
+
+Source reference: `CommunityBranchPlugin.java:84-142`
+
+### Compute Engine Components
+
+Components running during analysis report processing:
+
+- `CommunityReportAnalysisComponentProvider` - Provides analysis components
+
+Source reference: `CommunityBranchPlugin.java:82-83`
+
+## Feature Comparison
+
+<Note>
+**What's Included:**
+- ✅ Branch analysis and tracking
+- ✅ Pull request decoration
+- ✅ Quality gate status on PRs
+- ✅ Inline issue comments
+- ✅ Coverage and metric reporting
+- ✅ Multi-platform ALM support
+- ✅ CI auto-configuration
+- ✅ Branch housekeeping
+- ✅ MonoRepo support
+
+**What's Different from Commercial Editions:**
+- ⚠️ Community-maintained (not officially supported by SonarSource)
+- ⚠️ No guaranteed upgrade path to commercial editions
+- ⚠️ May lag behind SonarQube releases
+</Note>
+
+## Getting Started
+
+To start using these features:
+
+1. **Install the plugin** - Follow the installation guide for your deployment method
+2. **Configure ALM integration** - Set up your GitHub, GitLab, Bitbucket, or Azure DevOps connection
+3. **Run your first branch analysis** - Analyze a branch with `sonar.branch.name`
+4. **Analyze a pull request** - Use `sonar.pullrequest.*` parameters or rely on auto-configuration
+5. **View decorated PRs** - Check your ALM platform for quality gate status and comments
+
+For detailed configuration instructions, see the Configuration guide.

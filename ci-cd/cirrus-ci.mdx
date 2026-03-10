@@ -1,0 +1,442 @@
+---
+title: Cirrus CI
+description: Configure SonarQube analysis in Cirrus CI
+---
+
+## Auto-Configuration
+
+The plugin automatically detects Cirrus CI environments and configures branch and pull request analysis without manual property configuration.
+
+### Detection
+
+The auto-configurer activates when:
+
+- `CIRRUS_CI=true` is set in the environment
+- `CIRRUS_BRANCH` is not empty
+
+### Environment Variables Used
+
+| Variable | Purpose | Example |
+|----------|---------|----------|
+| `CIRRUS_CI` | Detects Cirrus CI environment | `true` |
+| `CIRRUS_BRANCH` | Branch name | `feature/add-feature` |
+| `CIRRUS_PR` | Pull request number | `123` |
+| `CIRRUS_BASE_BRANCH` | PR target branch | `main` |
+
+## Configuration Behavior
+
+### Pull Request Detection
+
+The plugin detects pull requests when:
+
+- `CIRRUS_PR` is not empty
+
+**Automatically configured properties:**
+
+- `sonar.pullrequest.key` - Set to `CIRRUS_PR`
+- `sonar.pullrequest.branch` - Set to `CIRRUS_BRANCH`
+- `sonar.pullrequest.base` - Set to `CIRRUS_BASE_BRANCH`
+
+### Branch Analysis
+
+For non-PR builds:
+
+**Automatically configured properties:**
+
+- `sonar.branch.name` - Set to `CIRRUS_BRANCH`
+
+## Usage Examples
+
+<CodeGroup>
+
+```yaml Basic Configuration
+container:
+  image: maven:3.9-eclipse-temurin-17
+
+env:
+  SONAR_TOKEN: ENCRYPTED[your-encrypted-token]
+  SONAR_HOST_URL: https://sonarqube.example.com
+
+sonarqube_task:
+  maven_cache:
+    folder: ~/.m2/repository
+  sonar_cache:
+    folder: ~/.sonar/cache
+  build_script:
+    - mvn clean verify
+  sonar_script:
+    - mvn sonar:sonar
+```
+
+```yaml Gradle Project
+container:
+  image: gradle:8-jdk17
+
+env:
+  SONAR_TOKEN: ENCRYPTED[your-encrypted-token]
+  SONAR_HOST_URL: https://sonarqube.example.com
+
+sonarqube_task:
+  gradle_cache:
+    folder: ~/.gradle/caches
+  sonar_cache:
+    folder: ~/.sonar/cache
+  build_script:
+    - gradle build
+  sonar_script:
+    - gradle sonar
+```
+
+```yaml Node.js Project
+container:
+  image: node:20
+
+env:
+  SONAR_TOKEN: ENCRYPTED[your-encrypted-token]
+  SONAR_HOST_URL: https://sonarqube.example.com
+
+sonarqube_task:
+  node_modules_cache:
+    folder: node_modules
+  sonar_cache:
+    folder: ~/.sonar/cache
+  install_script:
+    - npm ci
+  test_script:
+    - npm test -- --coverage
+  sonar_script:
+    - npx sonar-scanner
+```
+
+```yaml Python Project
+container:
+  image: python:3.12
+
+env:
+  SONAR_TOKEN: ENCRYPTED[your-encrypted-token]
+  SONAR_HOST_URL: https://sonarqube.example.com
+
+pip_cache:
+  folder: ~/.cache/pip
+
+sonarqube_task:
+  sonar_cache:
+    folder: ~/.sonar/cache
+  install_script:
+    - pip install -r requirements.txt
+    - pip install pytest pytest-cov
+  test_script:
+    - pytest --cov=. --cov-report=xml
+  sonar_script:
+    - |
+      curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+      unzip -q /tmp/sonar-scanner.zip -d /tmp
+      /tmp/sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner
+```
+
+```yaml Multi-Task Pipeline
+container:
+  image: maven:3.9-eclipse-temurin-17
+
+env:
+  SONAR_TOKEN: ENCRYPTED[your-encrypted-token]
+  SONAR_HOST_URL: https://sonarqube.example.com
+
+build_task:
+  maven_cache:
+    folder: ~/.m2/repository
+  compile_script:
+    - mvn clean compile
+
+test_task:
+  depends_on: build
+  maven_cache:
+    folder: ~/.m2/repository
+  test_script:
+    - mvn test
+  junit_artifacts:
+    path: "**/target/surefire-reports/*.xml"
+    format: junit
+
+sonarqube_task:
+  depends_on:
+    - build
+    - test
+  maven_cache:
+    folder: ~/.m2/repository
+  sonar_cache:
+    folder: ~/.sonar/cache
+  sonar_script:
+    - mvn sonar:sonar
+```
+
+```yaml Matrix Build
+container:
+  matrix:
+    - image: eclipse-temurin:17
+    - image: eclipse-temurin:21
+
+env:
+  SONAR_TOKEN: ENCRYPTED[your-encrypted-token]
+  SONAR_HOST_URL: https://sonarqube.example.com
+  matrix:
+    - JAVA_VERSION: 17
+    - JAVA_VERSION: 21
+
+test_task:
+  maven_cache:
+    folder: ~/.m2/repository
+  build_script:
+    - mvn clean verify
+
+sonarqube_task:
+  only_if: $JAVA_VERSION == '17'
+  depends_on: test
+  maven_cache:
+    folder: ~/.m2/repository
+  sonar_cache:
+    folder: ~/.sonar/cache
+  sonar_script:
+    - mvn sonar:sonar
+```
+
+</CodeGroup>
+
+## Configuration File
+
+Create a `sonar-project.properties` file in your repository root:
+
+```properties
+sonar.projectKey=my-project
+sonar.sources=src
+sonar.tests=tests
+sonar.exclusions=**/node_modules/**,**/dist/**,**/target/**
+sonar.coverage.exclusions=**/*.test.js,**/*.spec.js
+```
+
+## Encrypted Variables
+
+Cirrus CI supports encrypted environment variables. To encrypt your SonarQube token:
+
+1. Install Cirrus CLI:
+   ```bash
+   pip install cirrus-cli
+   ```
+
+2. Encrypt your token:
+   ```bash
+   cirrus encrypt --repository owner/repo SONAR_TOKEN="your-token-here"
+   ```
+
+3. Add the encrypted value to your `.cirrus.yml`:
+   ```yaml
+   env:
+     SONAR_TOKEN: ENCRYPTED[output-from-encrypt-command]
+   ```
+
+## Branch and PR Filters
+
+### Only on Main Branch
+
+```yaml
+sonarqube_task:
+  only_if: $CIRRUS_BRANCH == 'main'
+  sonar_script:
+    - mvn sonar:sonar
+```
+
+### On Protected Branches
+
+```yaml
+sonarqube_task:
+  only_if: $CIRRUS_BRANCH == 'main' || $CIRRUS_BRANCH == 'develop'
+  sonar_script:
+    - mvn sonar:sonar
+```
+
+### On Pull Requests and Main
+
+```yaml
+sonarqube_task:
+  only_if: $CIRRUS_PR != '' || $CIRRUS_BRANCH == 'main'
+  sonar_script:
+    - mvn sonar:sonar
+```
+
+## Advanced Configuration
+
+### Quality Gate Check
+
+```yaml
+sonarqube_task:
+  sonar_cache:
+    folder: ~/.sonar/cache
+  sonar_script:
+    - mvn sonar:sonar -Dsonar.qualitygate.wait=true
+  on_failure:
+    quality_gate_failed_script:
+      - echo "Quality gate failed!"
+```
+
+### Separate Analysis Task
+
+```yaml
+env:
+  SONAR_TOKEN: ENCRYPTED[your-encrypted-token]
+  SONAR_HOST_URL: https://sonarqube.example.com
+
+build_task:
+  container:
+    image: maven:3.9-eclipse-temurin-17
+  maven_cache:
+    folder: ~/.m2/repository
+  script:
+    - mvn clean package
+  binaries_artifacts:
+    path: "**/target/*.jar"
+
+sonarqube_task:
+  depends_on: build
+  container:
+    image: sonarsource/sonar-scanner-cli:latest
+  sonar_cache:
+    folder: ~/.sonar/cache
+  script:
+    - sonar-scanner
+```
+
+### Docker Compose
+
+```yaml
+docker_builder:
+  only_if: $CIRRUS_BRANCH == 'main' || $CIRRUS_PR != ''
+  env:
+    SONAR_TOKEN: ENCRYPTED[your-encrypted-token]
+    SONAR_HOST_URL: https://sonarqube.example.com
+  build_script:
+    - docker compose run --rm test
+  sonar_script:
+    - docker compose run --rm sonar
+```
+
+## Manual Override
+
+If you need to override the auto-detected values:
+
+```yaml
+sonarqube_task:
+  sonar_script:
+    - |
+      mvn sonar:sonar \
+        -Dsonar.pullrequest.key=$CIRRUS_PR \
+        -Dsonar.pullrequest.branch=$CIRRUS_BRANCH \
+        -Dsonar.pullrequest.base=$CIRRUS_BASE_BRANCH
+```
+
+## Platform-Specific Configuration
+
+### Linux ARM
+
+```yaml
+arm_container:
+  image: maven:3.9-eclipse-temurin-17
+
+sonarqube_task:
+  sonar_script:
+    - mvn sonar:sonar
+```
+
+### macOS
+
+```yaml
+macos_instance:
+  image: ghcr.io/cirruslabs/macos-sonoma-xcode:latest
+
+env:
+  SONAR_TOKEN: ENCRYPTED[your-encrypted-token]
+  SONAR_HOST_URL: https://sonarqube.example.com
+
+sonarqube_task:
+  install_script:
+    - brew install sonar-scanner
+  sonar_script:
+    - sonar-scanner
+```
+
+### Windows
+
+```yaml
+windows_container:
+  image: cirrusci/windowsservercore:latest
+
+sonarqube_task:
+  sonar_script:
+    - choco install sonarscanner-msbuild-net46 -y
+    - SonarScanner.MSBuild.exe begin /k:"my-project"
+    - msbuild /t:Rebuild
+    - SonarScanner.MSBuild.exe end
+```
+
+## Important Notes
+
+<Info>
+**Free for Open Source**
+
+Cirrus CI provides unlimited CI/CD minutes for open source projects, making it ideal for OSS projects.
+</Info>
+
+<Warning>
+**Clone Depth**
+
+Cirrus CI performs full clones by default, so you don't need to configure clone depth for accurate blame information.
+</Warning>
+
+## Troubleshooting
+
+### PR Decoration Not Working
+
+1. Verify your SCM integration is configured in SonarQube
+2. Check that `sonar.core.serverBaseURL` is set in SonarQube settings
+3. Ensure the SCM credentials have appropriate permissions
+
+### Environment Variables Not Set
+
+Debug environment variables:
+
+```yaml
+debug_task:
+  script:
+    - echo "CIRRUS_CI=$CIRRUS_CI"
+    - echo "CIRRUS_BRANCH=$CIRRUS_BRANCH"
+    - echo "CIRRUS_PR=$CIRRUS_PR"
+    - echo "CIRRUS_BASE_BRANCH=$CIRRUS_BASE_BRANCH"
+```
+
+### Cache Not Working
+
+Ensure cache folders are correctly specified:
+
+```yaml
+sonarqube_task:
+  maven_cache:
+    folder: ~/.m2/repository
+    fingerprint_script: cat pom.xml
+  sonar_cache:
+    folder: ~/.sonar/cache
+    fingerprint_script: echo $CIRRUS_BUILD_ID
+```
+
+### Memory Issues
+
+Increase container resources:
+
+```yaml
+container:
+  image: maven:3.9-eclipse-temurin-17
+  memory: 4GB
+  cpu: 2
+
+sonarqube_task:
+  sonar_script:
+    - mvn sonar:sonar -Dsonar.scanner.javaOpts="-Xmx2048m"
+```

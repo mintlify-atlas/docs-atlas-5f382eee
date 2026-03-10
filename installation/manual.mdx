@@ -1,0 +1,131 @@
+---
+title: Manual Installation
+description: Install the plugin directly on your SonarQube server
+---
+
+Manual installation gives you complete control over the plugin setup and is ideal for existing SonarQube installations.
+
+<Warning>
+  Always follow the installation instructions for the specific version of the plugin you're installing by checking the README on the relevant release tag.
+</Warning>
+
+## Prerequisites
+
+- Access to your SonarQube installation directory
+- Permission to modify configuration files
+- Permission to replace web directory contents
+- Compatible plugin version for your SonarQube version
+
+## Installation Steps
+
+<Steps>
+  <Step title="Download the Plugin">
+    Either build the project from source or [download a compatible release version](https://github.com/mc1arke/sonarqube-community-branch-plugin/releases) of:
+    - The plugin JAR file (`sonarqube-community-branch-plugin-${version}.jar`)
+    - The associated `sonarqube-webapp.zip` file
+    
+    <Note>
+      Replace `${version}` with the actual version number, e.g., `25.4.0`
+    </Note>
+  </Step>
+
+  <Step title="Copy Plugin JAR">
+    Copy the plugin JAR file to the `extensions/plugins/` directory of your SonarQube instance.
+    
+    ```bash
+    cp sonarqube-community-branch-plugin-${version}.jar /path/to/sonarqube/extensions/plugins/
+    ```
+  </Step>
+
+  <Step title="Configure Web Java Agent">
+    Add the following line to your SonarQube installation's `conf/sonar.properties` file:
+    
+    ```properties
+    sonar.web.javaAdditionalOpts=-javaagent:./extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=web
+    ```
+    
+    <Warning>
+      Replace `${version}` with the actual plugin version you're installing, e.g., `1.8.0` or `25.4.0`
+    </Warning>
+  </Step>
+
+  <Step title="Configure Compute Engine Java Agent">
+    Add the following line to your SonarQube installation's `conf/sonar.properties` file:
+    
+    ```properties
+    sonar.ce.javaAdditionalOpts=-javaagent:./extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=ce
+    ```
+    
+    <Warning>
+      Replace `${version}` with the actual plugin version you're installing
+    </Warning>
+  </Step>
+
+  <Step title="Replace Web Directory">
+    Replace the contents of the `web` directory in your SonarQube installation with the contents of the `sonarqube-webapp.zip` archive.
+    
+    ```bash
+    # Backup existing web directory
+    mv /path/to/sonarqube/web /path/to/sonarqube/web.backup
+    
+    # Extract new web directory
+    unzip sonarqube-webapp.zip -d /path/to/sonarqube/web
+    ```
+  </Step>
+
+  <Step title="Start SonarQube">
+    Start your SonarQube server. You will see a warning about using third-party plugins - accept this warning to continue.
+    
+    ```bash
+    /path/to/sonarqube/bin/[your-os]/sonar.sh start
+    ```
+  </Step>
+</Steps>
+
+## Configuration Example
+
+Your `conf/sonar.properties` file should include these lines:
+
+```properties
+# Community Branch Plugin Configuration
+sonar.web.javaAdditionalOpts=-javaagent:./extensions/plugins/sonarqube-community-branch-plugin-25.4.0.jar=web
+sonar.ce.javaAdditionalOpts=-javaagent:./extensions/plugins/sonarqube-community-branch-plugin-25.4.0.jar=ce
+```
+
+## Verification
+
+After starting SonarQube:
+
+1. Navigate to your SonarQube URL (typically `http://localhost:9000`)
+2. Log in as an administrator
+3. Go to **Administration > Marketplace > Installed**
+4. Verify that the Community Branch Plugin appears in the list
+5. Accept any warnings about third-party plugins
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Plugin not appearing in installed plugins">
+    - Verify the JAR file is in the correct `extensions/plugins/` directory
+    - Check that the file permissions allow SonarQube to read the file
+    - Review the SonarQube logs for any errors during startup
+  </Accordion>
+
+  <Accordion title="SonarQube fails to start">
+    - Verify the Java agent paths in `sonar.properties` are correct
+    - Ensure the plugin version in the path matches the actual JAR filename
+    - Check that the web directory was extracted correctly
+  </Accordion>
+
+  <Accordion title="Branch features not working">
+    - Confirm you're using a compatible plugin version for your SonarQube version
+    - Verify both web and CE Java agents are configured
+    - Check the SonarQube logs for any plugin-related errors
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<Card title="Configuration" icon="gear" href="/configuration/global-settings">
+  Configure the plugin and set up branch analysis
+</Card>

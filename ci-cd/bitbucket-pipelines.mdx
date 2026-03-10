@@ -1,0 +1,520 @@
+---
+title: Bitbucket Pipelines
+description: Configure SonarQube analysis in Bitbucket Pipelines
+---
+
+## Auto-Configuration
+
+The plugin automatically detects Bitbucket Pipelines environments and configures branch and pull request analysis without manual property configuration.
+
+### Detection
+
+The auto-configurer activates when:
+
+- `CI=true` is set in the environment
+- `BITBUCKET_BRANCH` is not empty
+
+### Environment Variables Used
+
+| Variable | Purpose | Example |
+|----------|---------|----------|
+| `CI` | Detects CI environment | `true` |
+| `BITBUCKET_BRANCH` | Branch name | `feature/add-feature` |
+| `BITBUCKET_PR_ID` | Pull request ID | `42` |
+| `BITBUCKET_PR_DESTINATION_BRANCH` | PR target branch | `main` |
+
+## Configuration Behavior
+
+### Pull Request Detection
+
+The plugin detects pull requests when:
+
+- `BITBUCKET_PR_ID` is not empty
+
+**Automatically configured properties:**
+
+- `sonar.pullrequest.key` - Set to `BITBUCKET_PR_ID`
+- `sonar.pullrequest.branch` - Set to `BITBUCKET_BRANCH`
+- `sonar.pullrequest.base` - Set to `BITBUCKET_PR_DESTINATION_BRANCH`
+
+### Branch Analysis
+
+For non-PR builds:
+
+**Automatically configured properties:**
+
+- `sonar.branch.name` - Set to `BITBUCKET_BRANCH`
+
+## Usage Examples
+
+<CodeGroup>
+
+```yaml Basic Configuration
+image: maven:3.9-eclipse-temurin-17
+
+definitions:
+  caches:
+    sonar: ~/.sonar/cache
+
+pipelines:
+  default:
+    - step:
+        name: Build and SonarQube Analysis
+        caches:
+          - maven
+          - sonar
+        script:
+          - mvn -B verify sonar:sonar
+          
+  branches:
+    main:
+      - step:
+          name: Build and SonarQube Analysis
+          caches:
+            - maven
+            - sonar
+          script:
+            - mvn -B verify sonar:sonar
+            
+  pull-requests:
+    '**':
+      - step:
+          name: Build and SonarQube Analysis
+          caches:
+            - maven
+            - sonar
+          script:
+            - mvn -B verify sonar:sonar
+```
+
+```yaml Gradle Project
+image: gradle:8-jdk17
+
+definitions:
+  caches:
+    sonar: ~/.sonar/cache
+    gradle: ~/.gradle
+
+pipelines:
+  default:
+    - step:
+        name: Build and SonarQube Analysis
+        caches:
+          - gradle
+          - sonar
+        script:
+          - gradle build sonar
+          
+  branches:
+    main:
+      - step:
+          name: Build and SonarQube Analysis
+          caches:
+            - gradle
+            - sonar
+          script:
+            - gradle build sonar
+            
+  pull-requests:
+    '**':
+      - step:
+          name: Build and SonarQube Analysis
+          caches:
+            - gradle
+            - sonar
+          script:
+            - gradle build sonar
+```
+
+```yaml Node.js Project
+image: node:20
+
+definitions:
+  caches:
+    sonar: ~/.sonar/cache
+
+pipelines:
+  default:
+    - step:
+        name: Test and SonarQube Analysis
+        caches:
+          - node
+          - sonar
+        script:
+          - npm ci
+          - npm test -- --coverage
+          - npx sonar-scanner
+          
+  branches:
+    main:
+      - step:
+          name: Test and SonarQube Analysis
+          caches:
+            - node
+            - sonar
+          script:
+            - npm ci
+            - npm test -- --coverage
+            - npx sonar-scanner
+            
+  pull-requests:
+    '**':
+      - step:
+          name: Test and SonarQube Analysis
+          caches:
+            - node
+            - sonar
+          script:
+            - npm ci
+            - npm test -- --coverage
+            - npx sonar-scanner
+```
+
+```yaml Multi-Step Pipeline
+image: atlassian/default-image:latest
+
+definitions:
+  caches:
+    sonar: ~/.sonar/cache
+  steps:
+    - step: &build
+        name: Build
+        image: maven:3.9-eclipse-temurin-17
+        caches:
+          - maven
+        script:
+          - mvn clean package
+        artifacts:
+          - target/**
+          
+    - step: &test
+        name: Test
+        image: maven:3.9-eclipse-temurin-17
+        caches:
+          - maven
+        script:
+          - mvn test
+        artifacts:
+          - target/surefire-reports/**
+          
+    - step: &sonar
+        name: SonarQube Analysis
+        image: sonarsource/sonar-scanner-cli:latest
+        caches:
+          - sonar
+        script:
+          - sonar-scanner
+
+pipelines:
+  default:
+    - step: *build
+    - step: *test
+    - step: *sonar
+    
+  branches:
+    main:
+      - step: *build
+      - step: *test
+      - step: *sonar
+      
+  pull-requests:
+    '**':
+      - step: *build
+      - step: *test
+      - step: *sonar
+```
+
+```yaml With SonarQube Pipe
+image: maven:3.9-eclipse-temurin-17
+
+pipelines:
+  default:
+    - step:
+        name: Build and Test
+        caches:
+          - maven
+        script:
+          - mvn clean verify
+        artifacts:
+          - target/**
+          
+    - step:
+        name: SonarQube Analysis
+        script:
+          - pipe: sonarsource/sonarqube-scan:2.0.1
+            variables:
+              SONAR_HOST_URL: $SONAR_HOST_URL
+              SONAR_TOKEN: $SONAR_TOKEN
+              
+  branches:
+    main:
+      - step:
+          name: Build and Test
+          caches:
+            - maven
+          script:
+            - mvn clean verify
+          artifacts:
+            - target/**
+            
+      - step:
+          name: SonarQube Analysis
+          script:
+            - pipe: sonarsource/sonarqube-scan:2.0.1
+              variables:
+                SONAR_HOST_URL: $SONAR_HOST_URL
+                SONAR_TOKEN: $SONAR_TOKEN
+                
+      - step:
+          name: Quality Gate
+          script:
+            - pipe: sonarsource/sonarqube-quality-gate:1.0.0
+              variables:
+                SONAR_TOKEN: $SONAR_TOKEN
+                
+  pull-requests:
+    '**':
+      - step:
+          name: Build and Test
+          caches:
+            - maven
+          script:
+            - mvn clean verify
+          artifacts:
+            - target/**
+            
+      - step:
+          name: SonarQube Analysis
+          script:
+            - pipe: sonarsource/sonarqube-scan:2.0.1
+              variables:
+                SONAR_HOST_URL: $SONAR_HOST_URL
+                SONAR_TOKEN: $SONAR_TOKEN
+```
+
+</CodeGroup>
+
+## Repository Variables
+
+Configure the following variables in **Repository settings > Pipelines > Repository variables**:
+
+| Variable | Value | Secured |
+|----------|-------|----------|
+| `SONAR_TOKEN` | Your SonarQube token | Yes |
+| `SONAR_HOST_URL` | Your SonarQube server URL | No |
+
+## Configuration File
+
+Create a `sonar-project.properties` file in your repository root:
+
+```properties
+sonar.projectKey=my-project
+sonar.sources=src
+sonar.tests=tests
+sonar.exclusions=**/node_modules/**,**/dist/**
+sonar.coverage.exclusions=**/*.test.js,**/*.spec.js
+```
+
+## Advanced Configuration
+
+### Parallel Steps
+
+```yaml
+image: maven:3.9-eclipse-temurin-17
+
+pipelines:
+  default:
+    - parallel:
+      - step:
+          name: Unit Tests
+          caches:
+            - maven
+          script:
+            - mvn test
+      - step:
+          name: Integration Tests
+          caches:
+            - maven
+          script:
+            - mvn verify -DskipUnitTests
+    - step:
+        name: SonarQube Analysis
+        caches:
+          - sonar
+        script:
+          - mvn sonar:sonar
+```
+
+### Conditional Execution
+
+```yaml
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Build and Analyze
+          script:
+            - mvn verify sonar:sonar
+    develop:
+      - step:
+          name: Build and Analyze
+          script:
+            - mvn verify sonar:sonar
+    feature/*:
+      - step:
+          name: Build Only
+          script:
+            - mvn verify
+            
+  pull-requests:
+    '**':
+      - step:
+          name: Build and Analyze
+          script:
+            - mvn verify sonar:sonar
+```
+
+### Custom Docker Image
+
+```yaml
+image: your-custom-image:latest
+
+definitions:
+  services:
+    docker:
+      memory: 2048
+
+pipelines:
+  default:
+    - step:
+        name: Build and Analyze
+        services:
+          - docker
+        script:
+          - docker build -t myapp .
+          - mvn verify sonar:sonar
+```
+
+### Quality Gate Enforcement
+
+```yaml
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Build and Test
+          script:
+            - mvn verify
+            
+      - step:
+          name: SonarQube Analysis
+          script:
+            - mvn sonar:sonar -Dsonar.qualitygate.wait=true
+```
+
+## Manual Override
+
+If you need to override the auto-detected values:
+
+```yaml
+pipelines:
+  pull-requests:
+    '**':
+      - step:
+          script:
+            - |
+              mvn sonar:sonar \
+                -Dsonar.pullrequest.key=$BITBUCKET_PR_ID \
+                -Dsonar.pullrequest.branch=$BITBUCKET_BRANCH \
+                -Dsonar.pullrequest.base=$BITBUCKET_PR_DESTINATION_BRANCH
+```
+
+## Using SonarQube Pipes
+
+Bitbucket provides official SonarQube pipes:
+
+### Scan Pipe
+
+```yaml
+- pipe: sonarsource/sonarqube-scan:2.0.1
+  variables:
+    SONAR_HOST_URL: $SONAR_HOST_URL
+    SONAR_TOKEN: $SONAR_TOKEN
+    # Optional parameters
+    SONAR_SCANNER_OPTS: "-Xmx512m"
+    DEBUG: "true"
+```
+
+### Quality Gate Pipe
+
+```yaml
+- pipe: sonarsource/sonarqube-quality-gate:1.0.0
+  variables:
+    SONAR_TOKEN: $SONAR_TOKEN
+```
+
+## Important Notes
+
+<Info>
+**Clone Depth**
+
+Bitbucket Pipelines uses shallow clones by default. For accurate blame information, consider increasing clone depth:
+
+```yaml
+clone:
+  depth: full
+```
+</Info>
+
+<Warning>
+**Pull Request Variables**
+
+`BITBUCKET_PR_ID` and `BITBUCKET_PR_DESTINATION_BRANCH` are only available when the pipeline is triggered by a pull request.
+</Warning>
+
+## Troubleshooting
+
+### PR Decoration Not Working
+
+1. Verify Bitbucket integration is configured in SonarQube
+2. Check that the Bitbucket app password has appropriate permissions
+3. Ensure `sonar.core.serverBaseURL` is set in SonarQube settings
+4. Verify pull request triggers are enabled
+
+### Environment Variables Not Set
+
+Debug environment variables:
+
+```yaml
+- step:
+    name: Debug
+    script:
+      - echo "CI=$CI"
+      - echo "BITBUCKET_BRANCH=$BITBUCKET_BRANCH"
+      - echo "BITBUCKET_PR_ID=$BITBUCKET_PR_ID"
+      - echo "BITBUCKET_PR_DESTINATION_BRANCH=$BITBUCKET_PR_DESTINATION_BRANCH"
+```
+
+### Memory Issues
+
+Increase memory for SonarQube scanner:
+
+```yaml
+- step:
+    name: SonarQube Analysis
+    size: 2x  # Double resources
+    script:
+      - mvn sonar:sonar -Dsonar.scanner.javaOpts="-Xmx1024m"
+```
+
+### Pipeline Timeout
+
+Increase step timeout:
+
+```yaml
+- step:
+    name: SonarQube Analysis
+    max-time: 10  # Minutes
+    script:
+      - mvn sonar:sonar
+```

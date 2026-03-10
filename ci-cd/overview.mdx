@@ -1,0 +1,93 @@
+---
+title: CI/CD Integration Overview
+description: Understand how the plugin automatically configures branch and pull request analysis in CI/CD environments
+---
+
+## Auto-Configuration
+
+The SonarQube Community Branch Plugin includes built-in auto-configuration for popular CI/CD platforms. When running in a supported CI environment, the plugin automatically detects branch and pull request information without requiring manual configuration of scanner properties.
+
+## How It Works
+
+Each auto-configurer detects the CI environment by checking for specific environment variables. Once detected, the plugin automatically configures:
+
+- **Branch analysis**: Sets `sonar.branch.name` based on the current branch
+- **Pull request analysis**: Sets `sonar.pullrequest.key`, `sonar.pullrequest.branch`, and `sonar.pullrequest.base`
+
+## Supported CI/CD Platforms
+
+The plugin provides auto-configuration for:
+
+- [GitHub Actions](/ci-cd/github-actions) - Detects via `GITHUB_ACTIONS`
+- [GitLab CI](/ci-cd/gitlab-ci) - Detects via `GITLAB_CI`
+- [Azure Pipelines](/ci-cd/azure-pipelines) - Detects via `TF_BUILD`
+- [Jenkins](/ci-cd/jenkins) - Detects via `JENKINS_HOME`
+- [Bitbucket Pipelines](/ci-cd/bitbucket-pipelines) - Detects via `CI` + `BITBUCKET_BRANCH`
+- [Cirrus CI](/ci-cd/cirrus-ci) - Detects via `CIRRUS_CI`
+
+## Configuration Priority
+
+The auto-configuration only applies when branch/PR properties are **not** manually specified. If you explicitly set properties like `sonar.branch.name` or `sonar.pullrequest.key`, those values take precedence over auto-detected values.
+
+## Branch vs Pull Request Analysis
+
+### Branch Analysis
+
+When no pull request is detected, the plugin configures a standard branch analysis:
+
+- Uses the branch name from the CI environment
+- Compares against the default branch or previous analysis of the same branch
+
+### Pull Request Analysis
+
+When a pull request is detected, the plugin configures pull request decoration:
+
+- Extracts the PR number/ID
+- Identifies the source branch (head branch)
+- Identifies the target branch (base branch)
+- Enables PR decoration features
+
+<Warning>
+Do **not** set `sonar.branch.name` when analyzing pull requests. This will cause the scanner to perform a branch analysis instead of a pull request analysis, preventing PR decoration.
+</Warning>
+
+## Manual Configuration Fallback
+
+If your CI platform is not supported or auto-configuration doesn't work for your setup, you can manually configure the scanner properties:
+
+### For Branch Analysis
+
+```bash
+sonar-scanner -Dsonar.branch.name=feature/my-branch
+```
+
+### For Pull Request Analysis
+
+```bash
+sonar-scanner \
+  -Dsonar.pullrequest.key=123 \
+  -Dsonar.pullrequest.branch=feature/my-branch \
+  -Dsonar.pullrequest.base=main
+```
+
+## GitHub-Specific Requirements
+
+When analyzing GitHub pull requests, you must also set `sonar.scm.revision` to the commit SHA:
+
+```bash
+-Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+```
+
+This ensures accurate code attribution and change tracking.
+
+## Server Configuration
+
+For PR decoration to work properly:
+
+1. Configure `sonar.core.serverBaseURL` in SonarQube at [/admin/settings](http://localhost:9000/admin/settings)
+2. Set up your SCM integration (GitHub, GitLab, Azure DevOps, or Bitbucket)
+3. Ensure the SonarQube server can reach your SCM provider (or vice versa for decoration)
+
+## Next Steps
+
+Select your CI/CD platform from the list above to see specific configuration examples and environment variable mappings.

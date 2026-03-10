@@ -1,0 +1,42 @@
+---
+title: Global Settings
+description: Configure essential SonarQube server settings for branch and pull request functionality
+---
+
+## Server Base URL
+
+The server base URL must be properly configured for pull request decoration links to work correctly.
+
+<ParamField path="sonar.core.serverBaseURL" type="string" required>
+  The base URL of your SonarQube server. This setting is essential for generating proper links in pull request comments.
+  
+  Configure this in SonarQube at **Administration > Configuration > General Settings > General**.
+  
+  **Example:** `https://sonarqube.example.com`
+</ParamField>
+
+<Warning>
+  Make sure `sonar.core.serverBaseURL` is properly set in order for the links in pull request comments to work. You can configure this at [/admin/settings](http://localhost:9000/admin/settings).
+</Warning>
+
+## Image Base URL
+
+By default, images for pull request decoration are served as static resources on the SonarQube server as part of the Community Branch Plugin.
+
+If your SonarQube server is behind a firewall and/or your PR service (GitHub, GitLab, etc.) doesn't have access to the SonarQube server, you need to configure an alternative image base URL.
+
+<ParamField path="com.github.mc1arke.sonarqube.plugin.branch.image-url-base" type="string">
+  Base URL used to load images for pull request comments. Only configure this if images are not displayed properly in your pull requests.
+  
+  Configure this in SonarQube at **Administration > Configuration > General Settings > General > Pull Request**.
+  
+  **Default:** Images are served from the SonarQube server
+  
+  **Recommended value:** `https://raw.githubusercontent.com/mc1arke/sonarqube-community-branch-plugin/master/src/main/resources/static`
+  
+  You can also download the image files from this location and host them yourself.
+</ParamField>
+
+## Project-Level Settings
+
+Most configuration properties can be set globally for all projects in the SonarQube administration settings. Review the **General > Pull Request** settings section to configure default values that apply to all projects.

@@ -1,0 +1,207 @@
+---
+title: Building from Source
+description: How to build the SonarQube Community Branch Plugin from source code
+---
+
+## Prerequisites
+
+Before building the plugin, ensure you have the following installed:
+
+- **Java 17 or higher** - The plugin is compiled with Java 17 compatibility
+- **Gradle** - Build automation tool (wrapper included)
+- **Node.js 22** - Required for building the web frontend
+- **Yarn** - Package manager for frontend dependencies
+- **Docker** (optional) - For containerized builds
+
+## Quick Build with Docker
+
+The fastest way to build and run the plugin is using Docker Compose:
+
+<Steps>
+  <Step title="Build and run with Docker Compose">
+    Run the following command from the project root:
+    ```bash
+    docker compose up --build
+    ```
+    This will build both the plugin and the modified frontend, then start a SonarQube instance with the plugin installed.
+  </Step>
+</Steps>
+
+## Building the Plugin JAR
+
+To build just the plugin JAR file:
+
+<Steps>
+  <Step title="Clean previous builds">
+    ```bash
+    ./gradlew clean
+    ```
+  </Step>
+
+  <Step title="Build the plugin">
+    ```bash
+    ./gradlew build
+    ```
+    This will:
+    - Download SonarQube libraries (first build only)
+    - Compile the Java source code
+    - Run all tests
+    - Generate the JAR file with bytecode manipulation using Javassist
+    - Create a shadow JAR with all dependencies
+  </Step>
+
+  <Step title="Locate the output">
+    The plugin JAR will be created at:
+    ```
+    build/libs/sonarqube-community-branch-plugin-{version}.jar
+    ```
+  </Step>
+</Steps>
+
+## Building the Web Frontend
+
+The plugin includes modifications to the SonarQube web interface:
+
+<Steps>
+  <Step title="Checkout with submodules">
+    ```bash
+    git clone --recurse-submodules https://github.com/mc1arke/sonarqube-community-branch-plugin.git
+    ```
+    Or if already cloned:
+    ```bash
+    git submodule update --init --recursive
+    ```
+  </Step>
+
+  <Step title="Set up symlink">
+    ```bash
+    ./sonarqube-webapp-addons/setup.sh
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    cd sonarqube-webapp
+    yarn install --no-immutable
+    ```
+  </Step>
+
+  <Step title="Build the frontend">
+    ```bash
+    yarn nx run sq-server:build
+    ```
+  </Step>
+
+  <Step title="Create the webapp archive">
+    ```bash
+    cd apps/sq-server/build/webapp
+    zip -r sonarqube-webapp.zip ./*
+    ```
+  </Step>
+</Steps>
+
+## Build Configuration
+
+### Gradle Dependencies
+
+The plugin uses the following key dependencies:
+
+- **Javassist 3.30.2-GA** - Bytecode manipulation library used by the Java agent
+- **OkHttp 5.3.2** - HTTP client for ALM provider communication
+- **JUnit 5** - Testing framework
+- **Mockito 5.22.0** - Mocking framework for tests
+- **AssertJ 3.27.7** - Fluent assertions for tests
+- **WireMock 3.13.2** - HTTP mocking for integration tests
+
+### SonarQube Version
+
+The plugin is built against SonarQube version **26.2.0.119303**. The build process automatically downloads the required SonarQube libraries from the official distribution:
+
+```groovy
+repositories {
+    ivy {
+        url 'https://binaries.sonarsource.com/'
+        patternLayout { artifact '/Distribution/[module]/[module]-[revision].[ext]' }
+    }
+}
+```
+
+### Shadow JAR Configuration
+
+The plugin uses the Shadow plugin to create a fat JAR with all dependencies bundled. The JAR manifest includes:
+
+- **Plugin-Key**: `communityBranchPlugin`
+- **Plugin-Class**: `com.github.mc1arke.sonarqube.plugin.CommunityBranchPluginBootstrap`
+- **Premain-Class**: `com.github.mc1arke.sonarqube.plugin.CommunityBranchAgent`
+- **Can-Retransform-Classes**: `true` (enables bytecode manipulation)
+
+## Running Tests
+
+<Steps>
+  <Step title="Run all tests">
+    ```bash
+    ./gradlew test
+    ```
+  </Step>
+
+  <Step title="Run with code coverage">
+    ```bash
+    ./gradlew test jacocoTestReport
+    ```
+    Coverage reports are generated in `build/reports/jacoco/test/html/`
+  </Step>
+
+  <Step title="Run mutation testing (optional)">
+    ```bash
+    ./gradlew pitest
+    ```
+    Uses PIT mutation testing to assess test quality
+  </Step>
+</Steps>
+
+## Build Output
+
+A successful build produces:
+
+1. **Plugin JAR** - `build/libs/sonarqube-community-branch-plugin-{version}.jar`
+2. **Test Reports** - `build/reports/tests/test/index.html`
+3. **Coverage Reports** - `build/reports/jacoco/test/html/index.html`
+4. **Web Frontend** - `sonarqube-webapp.zip` (if built separately)
+
+## Troubleshooting
+
+### Build Fails with "SonarQube libraries not found"
+
+The first build downloads SonarQube libraries which can take several minutes. If this fails:
+
+```bash
+./gradlew clean
+rm -rf sonarqube-lib/
+./gradlew build
+```
+
+### Java Version Mismatch
+
+Ensure you're using Java 17 or higher:
+
+```bash
+java -version
+```
+
+### Frontend Build Issues
+
+Ensure Node.js 22 is installed:
+
+```bash
+node --version
+yarn --version
+```
+
+Clear the yarn cache if needed:
+
+```bash
+cd sonarqube-webapp
+rm -rf node_modules
+yarn cache clean
+yarn install --no-immutable
+```

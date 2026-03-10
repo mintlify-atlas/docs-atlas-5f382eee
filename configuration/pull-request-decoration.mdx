@@ -1,0 +1,121 @@
+---
+title: Pull Request Decoration
+description: Configure pull request analysis and decoration for your repository
+---
+
+## Overview
+
+Pull request decoration allows SonarQube to post code quality findings directly to your pull requests. Before decorating a pull request, ensure you have analyzed the target branch first.
+
+<Info>
+  For comprehensive guidance, refer to the official SonarQube [pull request decoration documentation](https://docs.sonarqube.org/latest/analysis/pull-request/).
+</Info>
+
+## Auto-Configuration
+
+If your scan is running from a CI system that supports auto-configuration, the scanner can automatically detect pull request information without manual configuration.
+
+Supported CI systems:
+- GitHub Actions
+- GitLab CI
+- Azure DevOps
+- Bitbucket Pipelines
+- Jenkins
+- Cirrus CI
+- CodeMagic
+
+## Manual Configuration
+
+If your CI system doesn't support auto-configuration, you need to manually specify the pull request parameters.
+
+### Required Parameters
+
+<ParamField path="sonar.pullrequest.key" type="string" required>
+  The unique identifier for the pull request.
+  
+  This is typically the pull request number or ID from your ALM platform.
+  
+  **Example:** `100`
+</ParamField>
+
+<ParamField path="sonar.pullrequest.branch" type="string" required>
+  The name of the source branch (the branch containing the changes).
+  
+  **Example:** `feature/TICKET-123`
+</ParamField>
+
+<ParamField path="sonar.pullrequest.base" type="string" required>
+  The name of the target branch (the branch the PR will be merged into).
+  
+  **Examples:**
+  - `master`
+  - `main`
+  - `develop`
+</ParamField>
+
+<Warning>
+  There must not be any `sonar.branch` properties like `sonar.branch.name` set when you analyze a pull request. These properties indicate to SonarQube that a branch is being analyzed rather than a pull request, so no pull request decoration will be executed.
+</Warning>
+
+### GitHub-Specific Configuration
+
+<ParamField path="sonar.scm.revision" type="string">
+  The commit SHA of the pull request head.
+  
+  This parameter is **required for GitHub** pull requests to ensure accurate decoration.
+  
+  **Example:** `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0`
+</ParamField>
+
+## Example Configurations
+
+### Command Line
+
+```bash
+sonar-scanner \
+  -Dsonar.projectKey=my-project \
+  -Dsonar.sources=. \
+  -Dsonar.host.url=https://sonarqube.example.com \
+  -Dsonar.token=your-token \
+  -Dsonar.pullrequest.key=100 \
+  -Dsonar.pullrequest.branch=feature/TICKET-123 \
+  -Dsonar.pullrequest.base=master
+```
+
+### GitHub Actions
+
+Using the official [SonarQube Scan](https://github.com/marketplace/actions/official-sonarqube-scan) action:
+
+```yaml
+- name: SonarQube Scan
+  uses: sonarsource/sonarqube-scan-action@<action version>
+  with:
+    args: >
+      -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+  env:
+    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+```
+
+### sonar-project.properties
+
+```properties
+sonar.projectKey=my-project
+sonar.sources=.
+sonar.pullrequest.key=100
+sonar.pullrequest.branch=feature/TICKET-123
+sonar.pullrequest.base=master
+```
+
+## Troubleshooting
+
+### Pull Request Not Decorated
+
+1. Verify that the target branch has been analyzed first
+2. Ensure no `sonar.branch.*` properties are set during PR analysis
+3. Check that ALM integration is properly configured
+4. Verify that the SonarQube server URL is accessible from your ALM platform
+
+### Images Not Displaying
+
+If images are not displaying in pull request comments, configure the image base URL. See [Global Settings](/configuration/global-settings#image-base-url) for details.

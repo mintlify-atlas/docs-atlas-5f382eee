@@ -1,0 +1,400 @@
+---
+title: Debugging Guide
+description: How to debug issues, enable logging, and gather diagnostic information
+---
+
+This guide will help you diagnose and troubleshoot issues with the SonarQube Community Branch Plugin.
+
+## Enable Debug Logging
+
+### SonarQube Server Logs
+
+To enable debug logging for the plugin, add the following to `$SONARQUBE_HOME/conf/sonar.properties`:
+
+```properties
+# Enable debug logging for the plugin
+sonar.log.level.web=DEBUG
+sonar.log.level.ce=DEBUG
+
+# Or enable for specific plugin packages
+sonar.log.level.web.com.github.mc1arke.sonarqube.plugin=DEBUG
+sonar.log.level.ce.com.github.mc1arke.sonarqube.plugin=DEBUG
+```
+
+After making changes, restart SonarQube.
+
+### Scanner Logs
+
+To enable verbose scanner logging:
+
+```bash
+sonar-scanner -X -Dsonar.verbose=true
+```
+
+Or in your `sonar-project.properties`:
+```properties
+sonar.verbose=true
+```
+
+## Log Locations
+
+### SonarQube Server Logs
+
+```bash
+# Main application logs
+$SONARQUBE_HOME/logs/sonar.log
+
+# Web server logs (where javaagent=web runs)
+$SONARQUBE_HOME/logs/web.log
+
+# Compute Engine logs (where javaagent=ce runs and PR decoration happens)
+$SONARQUBE_HOME/logs/ce.log
+
+# Elasticsearch logs
+$SONARQUBE_HOME/logs/es.log
+```
+
+### Docker Logs
+
+```bash
+# View container logs
+docker logs <container_name>
+
+# Follow logs in real-time
+docker logs -f <container_name>
+
+# View compute engine logs specifically
+docker exec <container_name> tail -f /opt/sonarqube/logs/ce.log
+```
+
+### Kubernetes Logs
+
+```bash
+# View pod logs
+kubectl logs <pod_name>
+
+# View specific container logs
+kubectl logs <pod_name> -c sonarqube
+
+# Follow logs
+kubectl logs -f <pod_name>
+
+# View compute engine logs
+kubectl exec <pod_name> -- tail -f /opt/sonarqube/logs/ce.log
+```
+
+## Verify Plugin Installation
+
+### Check Plugin is Loaded
+
+Look for these messages in `web.log` and `ce.log` on startup:
+
+```log
+[main] INFO  com.github.mc1arke.sonarqube.plugin.CommunityBranchAgent - Loading agent
+```
+
+If you don't see this message, the javaagent is not configured correctly.
+
+### Verify Plugin Version
+
+Check installed plugins via API:
+
+```bash
+curl -u admin:admin http://localhost:9000/api/plugins/installed | jq '.plugins[] | select(.key=="communitybranchplugin")'
+```
+
+Or check the System Info page:
+1. Log in as administrator
+2. Go to Administration > System > System Info
+3. Look for "Community Branch Plugin" in the Plugins section
+
+### Check Plugin Files
+
+```bash
+# Verify plugin JAR exists
+ls -lh $SONARQUBE_HOME/extensions/plugins/sonarqube-community-branch-plugin-*.jar
+
+# Verify web assets are installed
+ls -lh $SONARQUBE_HOME/web/
+
+# Check JAR manifest
+unzip -p $SONARQUBE_HOME/extensions/plugins/sonarqube-community-branch-plugin-*.jar META-INF/MANIFEST.MF
+```
+
+## Diagnose Java Agent Issues
+
+### Verify Agent Arguments
+
+Check that the javaagent is being loaded:
+
+```bash
+# View the running Java process
+ps aux | grep sonarqube
+
+# On the web process, you should see:
+-javaagent:./extensions/plugins/sonarqube-community-branch-plugin-X.Y.Z.jar=web
+
+# On the CE process, you should see:
+-javaagent:./extensions/plugins/sonarqube-community-branch-plugin-X.Y.Z.jar=ce
+```
+
+### Check for Class Transformation
+
+With debug logging enabled, look for these messages in the logs:
+
+```log
+[main] DEBUG com.github.mc1arke.sonarqube.plugin.CommunityBranchAgent - Transforming class org.sonar.core.platform.PlatformEditionProvider
+[main] DEBUG com.github.mc1arke.sonarqube.plugin.CommunityBranchAgent - Transforming class org.sonar.server.almsettings.MultipleAlmFeature
+```
+
+If these messages are missing, the agent is not transforming classes correctly.
+
+### Common Agent Errors
+
+#### ClassNotFoundException
+
+```log
+Caused by: java.lang.ClassNotFoundException: com.github.mc1arke.sonarqube.plugin.CommunityBranchAgent
+```
+
+**Solution:** The plugin JAR file path in the javaagent configuration is incorrect or the file doesn't exist.
+
+#### NoClassDefFoundError
+
+```log
+Caused by: java.lang.NoClassDefFoundError: javassist/CtClass
+```
+
+**Solution:** Version mismatch between plugin and SonarQube. Ensure you're using matching versions.
+
+## Diagnose Branch Analysis Issues
+
+### Verify Branch Parameters
+
+Add verbose logging to see what parameters the scanner is detecting:
+
+```bash
+sonar-scanner -X 2>&1 | grep -E "(sonar.branch|sonar.pullrequest)"
+```
+
+You should see output like:
+```
+sonar.branch.name=feature/new-feature
+```
+
+or for pull requests:
+```
+sonar.pullrequest.key=123
+sonar.pullrequest.branch=feature/new-feature
+sonar.pullrequest.base=main
+```
+
+### Check Auto-Configuration
+
+When auto-configuration is working, you'll see log messages like:
+
+```log
+INFO: Auto detected PULL_REQUEST configuration with source feature-branch using com.github.mc1arke.sonarqube.plugin.scanner.autoconfiguration.GithubActionsAutoConfigurer
+```
+
+If auto-configuration fails, the scanner falls back to default branch analysis.
+
+### Verify Target Branch Exists
+
+Check that the target branch has been analyzed:
+
+```bash
+curl -u admin:admin "http://localhost:9000/api/project_branches/list?project=my-project" | jq
+```
+
+The target branch (usually `main` or `master`) must exist before analyzing pull requests.
+
+## Diagnose Pull Request Decoration Issues
+
+### Check Post-Analysis Task Execution
+
+Look for these messages in `ce.log` after an analysis:
+
+```log
+INFO  com.github.mc1arke.sonarqube.plugin.ce.pullrequest.PullRequestPostAnalysisTask - Using pull request decorator com.github.mc1arke.sonarqube.plugin.ce.pullrequest.github.GithubPullRequestDecorator
+```
+
+If you see:
+```log
+INFO  com.github.mc1arke.sonarqube.plugin.ce.pullrequest.PullRequestPostAnalysisTask - No decorator found for this Pull Request
+```
+
+Then the ALM configuration is missing or incorrect.
+
+### Check ALM Configuration
+
+Verify ALM settings via API:
+
+```bash
+# List ALM settings
+curl -u admin:admin "http://localhost:9000/api/alm_settings/list" | jq
+
+# Get project binding
+curl -u admin:admin "http://localhost:9000/api/alm_settings/get_binding?project=my-project" | jq
+```
+
+### Test ALM Connectivity
+
+Use the validation endpoint to test your ALM configuration:
+
+```bash
+curl -u admin:admin -X POST "http://localhost:9000/api/alm_settings/validate" \
+  -d "almSetting=my-github-config" \
+  -d "project=my-project"
+```
+
+### Common Decoration Errors
+
+#### "No commit details were submitted with this analysis"
+
+**Cause:** The analysis was run outside of a Git repository or Git metadata is not available.
+
+**Solution:** Ensure you're running the scanner in a Git repository with committed changes.
+
+#### "No analysis results were created for this project analysis"
+
+**Cause:** The analysis failed before completing.
+
+**Solution:** Check earlier logs for analysis errors. Fix any quality profile or rule errors.
+
+#### "No pull request ID has been submitted with the Pull Request"
+
+**Cause:** Missing `sonar.pullrequest.key` parameter.
+
+**Solution:** Ensure PR key is set:
+```bash
+sonar-scanner -Dsonar.pullrequest.key=123
+```
+
+## Gather Diagnostic Information
+
+When reporting issues, include the following information:
+
+### System Information
+
+```bash
+# SonarQube version
+curl http://localhost:9000/api/system/status | jq
+
+# System info (requires admin)
+curl -u admin:admin http://localhost:9000/api/system/info | jq
+```
+
+### Plugin Information
+
+```bash
+# Plugin version
+ls -l $SONARQUBE_HOME/extensions/plugins/sonarqube-community-branch-plugin-*.jar
+
+# Installed plugins
+curl -u admin:admin http://localhost:9000/api/plugins/installed | jq
+```
+
+### Configuration
+
+```bash
+# Check javaagent configuration (sanitize sensitive data)
+grep -i javaadditional $SONARQUBE_HOME/conf/sonar.properties
+
+# Check log levels
+grep -i "sonar.log.level" $SONARQUBE_HOME/conf/sonar.properties
+```
+
+### Log Excerpts
+
+Include relevant excerpts from:
+- `web.log` - showing plugin loading
+- `ce.log` - showing PR decoration attempts
+- Scanner output with `-X` flag
+
+**Remember to sanitize sensitive information like:**
+- API tokens
+- Passwords
+- Server URLs (if internal)
+- Project names (if confidential)
+
+## API Endpoints for Troubleshooting
+
+### Check Pull Request Status
+
+```bash
+# List pull requests for a project
+curl -u admin:admin "http://localhost:9000/api/project_pull_requests/list?project=my-project" | jq
+```
+
+### Check Branch Status
+
+```bash
+# List branches for a project
+curl -u admin:admin "http://localhost:9000/api/project_branches/list?project=my-project" | jq
+```
+
+### Check Quality Gate Status
+
+```bash
+# Get quality gate status for a project
+curl -u admin:admin "http://localhost:9000/api/qualitygates/project_status?projectKey=my-project" | jq
+```
+
+### Plugin-Specific Endpoints
+
+The plugin provides diagnostic endpoints:
+
+```bash
+# Get plugin support information
+curl -u admin:admin "http://localhost:9000/api/community_branch/support/info" | jq
+```
+
+## Performance Debugging
+
+### Monitor Compute Engine Performance
+
+Check CE queue and processing times:
+
+```bash
+# View CE activity
+curl -u admin:admin "http://localhost:9000/api/ce/activity?status=SUCCESS,FAILED,CANCELED" | jq
+
+# View CE queue
+curl -u admin:admin "http://localhost:9000/api/ce/activity_status" | jq
+```
+
+### Database Queries
+
+If you have direct database access, check pull request data:
+
+```sql
+-- View pull request branches
+SELECT pb.project_uuid, pb.kee, pb.branch_type, pb.merge_branch_uuid
+FROM project_branches pb
+WHERE pb.branch_type = 'PULL_REQUEST';
+
+-- View project ALM settings
+SELECT pas.project_uuid, pas.alm_setting_uuid, alm.alm_id
+FROM project_alm_settings pas
+JOIN alm_settings alm ON pas.alm_setting_uuid = alm.uuid;
+```
+
+## Getting Help
+
+<Warning>
+This plugin is **not supported by SonarSource**. Do not contact SonarSource support or the Sonar Community forum for help with this plugin.
+</Warning>
+
+If you need help after following this debugging guide:
+
+1. **Search existing issues**: Check [GitHub Issues](https://github.com/mc1arke/sonarqube-community-branch-plugin/issues) for similar problems
+2. **Stack Overflow**: Search for `sonarqube-community-branch-plugin` tag
+3. **Create a new issue**: If you've found a bug, [create an issue](https://github.com/mc1arke/sonarqube-community-branch-plugin/issues/new) with:
+   - SonarQube version
+   - Plugin version
+   - Relevant log excerpts (sanitized)
+   - Steps to reproduce
+   - Expected vs actual behavior
+
+See [Support Limitations](/introduction#support-and-limitations) for more information.

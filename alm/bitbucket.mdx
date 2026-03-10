@@ -1,0 +1,366 @@
+---
+title: Bitbucket Integration
+description: Configure Bitbucket Cloud and Server pull request decoration with Code Insights reports and annotations
+---
+
+The Bitbucket integration provides pull request decoration for both Bitbucket Cloud and Bitbucket Server (formerly Stash) using the Code Insights API, including reports, annotations, and build status.
+
+## Features
+
+The Bitbucket integration provides:
+
+- **Code Insights Reports**: Creates detailed reports with metrics on each commit
+- **Annotations**: Adds inline annotations directly on changed lines in the pull request
+- **Build Status**: Sets commit build status (Bitbucket Cloud only)
+- **Quality Metrics**: Reports new issues, accepted issues, fixed issues, coverage, and duplication
+- **Monorepo Support**: Separate reports for each project in a monorepo
+
+### Report Details
+
+Each Code Insights report includes:
+- Report title: "SonarQube"
+- Report status: PASSED or FAILED based on quality gate
+- Report data:
+  - New Issues count
+  - Accepted Issues count
+  - Fixed Issues count
+  - Code coverage percentage
+  - Duplication percentage
+  - Link to SonarQube dashboard
+- Report description with quality gate status and failed conditions
+- Logo URL linking to SonarQube branding
+
+### Annotation Details
+
+Annotations provide inline feedback with:
+- Annotation at the specific line number where the issue was detected
+- Issue message and severity
+- Issue type (BUG, VULNERABILITY, CODE_SMELL)
+- Link to view the full issue in SonarQube
+
+### Severity Mapping
+
+| SonarQube Severity | Bitbucket Annotation Severity |
+|--------------------|-------------------------------|
+| HIGH, BLOCKER | HIGH |
+| MEDIUM | MEDIUM |
+| LOW, INFO | LOW |
+
+### Type Mapping
+
+| SonarQube Software Quality | Bitbucket Annotation Type |
+|----------------------------|---------------------------|
+| SECURITY | VULNERABILITY |
+| MAINTAINABILITY | CODE_SMELL |
+| RELIABILITY | BUG |
+
+## Platform Support
+
+The plugin supports both Bitbucket platforms:
+
+### Bitbucket Cloud
+- Requires OAuth client credentials for authentication
+- Supports Code Insights API
+- Supports Build Status API
+- Annotation limit: 1000 annotations per report
+- Batch size: 100 annotations per request
+
+### Bitbucket Server / Data Center
+- Requires personal access token for authentication
+- Requires version 5.15 or higher for Code Insights support
+- Supports Code Insights API
+- Does NOT support Build Status API (status via Code Insights only)
+- Annotation limit: 1000 annotations per report
+- Batch size: 100 annotations per request
+
+## Authentication
+
+### Bitbucket Cloud Authentication
+
+Bitbucket Cloud uses **OAuth 2.0 Client Credentials** for authentication.
+
+#### Creating OAuth Credentials
+
+<Steps>
+  <Step title="Navigate to Workspace Settings">
+    In Bitbucket Cloud, go to your workspace → **Settings** → **OAuth consumers**
+  </Step>
+  
+  <Step title="Add OAuth Consumer">
+    Click "Add consumer" and provide:
+    - **Name**: A descriptive name (e.g., "SonarQube Integration")
+    - **Callback URL**: Can be any valid URL (not used, but required)
+    - **URL**: Can be your SonarQube instance URL (optional)
+  </Step>
+  
+  <Step title="Configure Permissions">
+    Under "Permissions", select:
+    - **Account**: Read
+    - **Repositories**: Read and Write
+    - **Pull requests**: Read and Write
+  </Step>
+  
+  <Step title="Save Credentials">
+    After saving:
+    - Note the **Key** (Client ID)
+    - Note the **Secret** (Client Secret)
+    - Both will be needed for SonarQube configuration
+  </Step>
+</Steps>
+
+### Bitbucket Server Authentication
+
+Bitbucket Server uses **Personal Access Tokens** for authentication.
+
+#### Creating a Personal Access Token
+
+<Steps>
+  <Step title="Navigate to Personal Settings">
+    In Bitbucket Server, click your profile → **Manage account** → **Personal access tokens**
+  </Step>
+  
+  <Step title="Create Token">
+    Click "Create a token" and provide:
+    - **Token name**: A descriptive name (e.g., "SonarQube Integration")
+    - **Expiry**: Set an expiration date (optional)
+  </Step>
+  
+  <Step title="Configure Permissions">
+    Select permissions:
+    - **Project permissions**: Read
+    - **Repository permissions**: Write
+  </Step>
+  
+  <Step title="Save Token">
+    Copy the token immediately - it won't be shown again
+  </Step>
+</Steps>
+
+## Configuration
+
+### Global Configuration
+
+Configure the Bitbucket connection in SonarQube:
+
+<Steps>
+  <Step title="Navigate to Administration">
+    Go to **Administration** → **Configuration** → **General Settings** → **ALM Integrations**
+  </Step>
+  
+  <Step title="Select Bitbucket Type">
+    Choose either:
+    - **Bitbucket Cloud** for cloud-hosted Bitbucket
+    - **Bitbucket Server** for self-hosted Bitbucket
+  </Step>
+  
+  <Step title="Add Configuration">
+    **For Bitbucket Cloud**:
+    - **Configuration Name**: A unique identifier
+    - **Workspace ID**: Your Bitbucket workspace ID
+    - **OAuth Key**: The OAuth consumer key (Client ID)
+    - **OAuth Secret**: The OAuth consumer secret (Client Secret)
+    
+    **For Bitbucket Server**:
+    - **Configuration Name**: A unique identifier
+    - **Bitbucket Server URL**: `https://your-bitbucket-server.com`
+    - **Personal Access Token**: The token created above
+  </Step>
+</Steps>
+
+### Project Configuration
+
+Bind each SonarQube project to a Bitbucket repository:
+
+<Steps>
+  <Step title="Navigate to Project Settings">
+    Go to your project → **Administration** → **General Settings** → **Pull Request Decoration**
+  </Step>
+  
+  <Step title="Configure Project Binding">
+    Provide:
+    - **Configuration name**: Select the Bitbucket configuration created above
+    - **Repository SLUG**: The repository slug (e.g., `my-repo`)
+    - **Repository Name / Project Key**: 
+      - For Cloud: Workspace ID or repository full name
+      - For Server: Project key (e.g., `PROJ`)
+  </Step>
+  
+  <Step title="Optional Settings">
+    - **Monorepo**: Enable if this project is part of a monorepo
+  </Step>
+</Steps>
+
+<Note>
+  The exact parameters differ slightly between Bitbucket Cloud and Server. Ensure you're using the correct format for your platform.
+</Note>
+
+## Scanner Configuration
+
+When running analysis on a pull request, provide these parameters:
+
+```bash
+sonar-scanner \
+  -Dsonar.pullrequest.key=123 \
+  -Dsonar.pullrequest.branch=feature-branch \
+  -Dsonar.pullrequest.base=main
+```
+
+### Required Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|----------|
+| `sonar.pullrequest.key` | Pull request ID | `123` |
+| `sonar.pullrequest.branch` | Source branch name | `feature-branch` |
+| `sonar.pullrequest.base` | Target branch name | `main` |
+
+## Code Insights Reports
+
+Reports are created on the commit SHA and include:
+
+### Report Key
+
+- Default: `com.sonarsource.sonarqube`
+- Monorepo: `{project-key}` (normalized to meet Bitbucket requirements)
+
+Report keys are automatically normalized:
+- Bitbucket Cloud: Max 64 characters, alphanumeric and dashes only
+- Bitbucket Server: Max 100 characters
+
+### Report Metrics
+
+The report includes these data points:
+
+1. **New Issues**: Count of new issues detected
+2. **Accepted Issues**: Count of accepted (won't fix) issues
+3. **Fixed Issues**: Count of issues resolved
+4. **Code Coverage**: Percentage of new code covered by tests
+5. **Duplication**: Percentage of duplicated lines in new code
+6. **Analysis Details**: Link to the full SonarQube analysis
+
+### Report Status
+
+- **PASSED**: Quality gate passed
+- **FAILED**: Quality gate failed
+
+The report description includes the quality gate status and lists all failed quality gate conditions.
+
+## Annotations
+
+Annotations are uploaded in batches to stay within API limits.
+
+### Annotation Limits
+
+Both Bitbucket Cloud and Server:
+- Maximum: 1000 annotations per report
+- Batch size: 100 annotations per upload
+- Maximum 10 batches per report
+
+### Annotation Handling
+
+1. Previous annotations are deleted before uploading new ones
+2. Annotations are batched into groups of 100
+3. If the limit is exceeded, a warning is logged and remaining annotations are truncated
+4. If a batch payload is too large, the upload stops with a warning
+
+### Annotation Content
+
+Each annotation includes:
+- **Line**: The line number where the issue was detected
+- **Message**: The issue message from SonarQube
+- **Severity**: LOW, MEDIUM, or HIGH
+- **Type**: BUG, VULNERABILITY, or CODE_SMELL
+- **Link**: URL to view the issue in SonarQube
+
+## Build Status (Cloud Only)
+
+Bitbucket Cloud receives both a Code Insights report AND a build status.
+
+The build status includes:
+- **Key**: Report key (same as Code Insights)
+- **Name**: "SonarQube"
+- **State**: SUCCESSFUL or FAILED
+- **URL**: Link to the SonarQube dashboard
+
+<Note>
+  Bitbucket Server does NOT support the Build Status API. Status is communicated solely through the Code Insights report.
+</Note>
+
+## Monorepo Support
+
+For monorepo setups:
+
+1. Enable the **Monorepo** option in project settings
+2. Each project creates a separate report with a unique key based on the project key
+3. Report keys are normalized to meet platform requirements
+4. This allows multiple SonarQube projects to decorate the same PR without conflicts
+
+## Implementation Details
+
+The Bitbucket decorator is implemented in:
+- `BitbucketPullRequestDecorator` (src/main/java/com/github/mc1arke/sonarqube/plugin/ce/pullrequest/bitbucket/)
+- `BitbucketCloudClient` (src/main/java/com/github/mc1arke/sonarqube/plugin/almclient/bitbucket/)
+- `BitbucketServerClient` (src/main/java/com/github/mc1arke/sonarqube/plugin/almclient/bitbucket/)
+
+### Key Behaviors
+
+- OAuth bearer tokens are negotiated for Bitbucket Cloud using client credentials
+- Bitbucket Server checks version compatibility (requires 5.15+)
+- Annotations are chunked and uploaded in batches
+- Report keys are normalized to meet platform-specific constraints
+- Payload size limits are enforced to avoid API errors
+
+### API Endpoints Used
+
+**Bitbucket Cloud**:
+- `POST /2.0/repositories/{workspace}/{repo}/commit/{sha}/reports/{key}` - Upload report
+- `POST /2.0/repositories/{workspace}/{repo}/commit/{sha}/reports/{key}/annotations` - Upload annotations
+- `POST /2.0/repositories/{workspace}/{repo}/commit/{sha}/statuses/build` - Submit build status
+- `POST /site/oauth2/access_token` - Negotiate OAuth token
+
+**Bitbucket Server**:
+- `PUT /rest/insights/1.0/projects/{project}/repos/{repo}/commits/{sha}/reports/{key}` - Upload report
+- `POST /rest/insights/1.0/projects/{project}/repos/{repo}/commits/{sha}/reports/{key}/annotations` - Upload annotations
+- `DELETE /rest/insights/1.0/projects/{project}/repos/{repo}/commits/{sha}/reports/{key}/annotations` - Delete annotations
+- `GET /rest/api/1.0/application-properties` - Check server version
+
+## Troubleshooting
+
+### Code Insights Not Supported
+
+If you see "Your Bitbucket instance does not support the Code Insights API":
+
+- **Bitbucket Server**: Upgrade to version 5.15 or higher
+- **Bitbucket Cloud**: This should always be supported; check authentication
+
+### OAuth Authentication Failure (Cloud)
+
+If bearer token negotiation fails:
+1. Verify the OAuth key and secret are correct
+2. Check that the OAuth consumer has required permissions
+3. Ensure the consumer is enabled in Bitbucket workspace settings
+
+### Repository Not Found
+
+Verify the repository identifiers:
+
+**Bitbucket Cloud**:
+- Workspace ID: The workspace slug in the URL
+- Repository slug: The repository slug in the URL (e.g., `my-repo`)
+
+**Bitbucket Server**:
+- Project key: The short project code (e.g., `PROJ`, usually all caps)
+- Repository slug: The repository slug (e.g., `my-repo`)
+
+### Annotation Limits
+
+If you see warnings about annotation limits:
+- The plugin automatically handles limits by truncating
+- Consider filtering issues or reducing scope of analysis
+- Focus on changed code rather than full repository scans
+
+### Server URL Format
+
+For Bitbucket Server, ensure the URL:
+- ✅ `https://bitbucket.company.com`
+- ❌ `https://bitbucket.company.com/scm` (don't include /scm)
+- ✅ Include protocol (https://)

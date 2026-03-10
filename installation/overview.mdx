@@ -1,0 +1,96 @@
+---
+title: Installation Overview
+description: Choose the right installation method for your environment
+---
+
+The SonarQube Community Branch Plugin can be installed using several different methods. Choose the one that best fits your infrastructure and deployment strategy.
+
+## Installation Methods
+
+<CardGroup cols={2}>
+  <Card title="Manual Installation" icon="wrench" href="/installation/manual">
+    Install directly on your SonarQube server by copying files and configuring Java agents
+  </Card>
+  
+  <Card title="Docker" icon="docker" href="/installation/docker">
+    Use the pre-built Docker image with the plugin already configured
+  </Card>
+  
+  <Card title="Docker Compose" icon="layer-group" href="/installation/docker-compose">
+    Deploy with PostgreSQL database using Docker Compose
+  </Card>
+  
+  <Card title="Kubernetes" icon="dharmachakra" href="/installation/kubernetes">
+    Install using the official SonarQube Helm chart with plugin configuration
+  </Card>
+</CardGroup>
+
+## Which Method Should I Choose?
+
+### Manual Installation
+
+Best for:
+- Existing SonarQube installations where you want to add branch support
+- Environments where you manage SonarQube directly on servers
+- Custom deployment scenarios
+
+**Requirements:**
+- Access to SonarQube installation directory
+- Ability to modify `conf/sonar.properties`
+- Ability to replace the `web` directory contents
+
+### Docker
+
+Best for:
+- Quick setup and testing
+- Container-based deployments
+- Development environments
+
+**Requirements:**
+- Docker installed
+- Ability to run containers
+
+### Docker Compose
+
+Best for:
+- Complete local development setup
+- Testing with a full database
+- Quick proof-of-concept deployments
+
+**Requirements:**
+- Docker Compose installed
+- Understanding of Docker networking
+
+### Kubernetes
+
+Best for:
+- Production deployments on Kubernetes
+- Organizations already using the official SonarQube Helm chart
+- Scalable, cloud-native environments
+
+**Requirements:**
+- Kubernetes cluster access
+- Helm 3 installed
+- Knowledge of Kubernetes deployments
+
+## Version Compatibility
+
+<Warning>
+  The plugin major and minor versions must match the SonarQube version. For example, version `25.4.0` of the plugin is compatible with SonarQube 25.4.x.
+</Warning>
+
+Always ensure you're using a compatible plugin version for your SonarQube installation. Using mismatched versions may result in errors or unexpected behavior.
+
+## Important Notes
+
+<Note>
+  This plugin is not maintained or supported by SonarSource. Support is only available through GitHub issues or community channels like StackOverflow.
+</Note>
+
+- There is no official upgrade path to SonarQube Commercial Editions
+- Migrating to a commercial edition after using this plugin may result in data loss
+- Always follow the installation instructions for the specific version you're installing
+
+## Next Steps
+
+Select your preferred installation method from the cards above to continue with detailed instructions.

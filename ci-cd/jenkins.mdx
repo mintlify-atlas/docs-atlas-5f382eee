@@ -1,0 +1,481 @@
+---
+title: Jenkins
+description: Configure SonarQube analysis in Jenkins pipelines
+---
+
+## Auto-Configuration
+
+The plugin automatically detects Jenkins environments and configures branch and pull request analysis without manual property configuration.
+
+### Detection
+
+The auto-configurer activates when:
+
+- `JENKINS_HOME` is set in the environment
+
+### Environment Variables Used
+
+| Variable | Purpose | Example |
+|----------|---------|----------|
+| `JENKINS_HOME` | Detects Jenkins environment | `/var/lib/jenkins` |
+| `CHANGE_ID` | Pull request ID (multibranch pipelines) | `123` |
+| `CHANGE_BRANCH` | PR source branch | `feature/add-feature` |
+| `CHANGE_TARGET` | PR target branch | `main` |
+| `BRANCH_NAME` | Branch name | `develop` |
+
+## Configuration Behavior
+
+### Pull Request Detection
+
+The plugin detects pull requests when:
+
+- `CHANGE_ID` is not empty (available in multibranch pipelines)
+
+**Automatically configured properties:**
+
+- `sonar.pullrequest.key` - Set to `CHANGE_ID`
+- `sonar.pullrequest.branch` - Set to `CHANGE_BRANCH`
+- `sonar.pullrequest.base` - Set to `CHANGE_TARGET`
+
+### Branch Analysis
+
+For non-PR builds:
+
+**Automatically configured properties:**
+
+- `sonar.branch.name` - Set to `BRANCH_NAME`
+
+<Info>
+**Multibranch Pipelines Required**
+
+Auto-configuration works best with Jenkins Multibranch Pipeline jobs, which automatically set the required environment variables.
+</Info>
+
+## Usage Examples
+
+<CodeGroup>
+
+```groovy Declarative Pipeline
+pipeline {
+    agent any
+    
+    environment {
+        SONAR_TOKEN = credentials('sonarqube-token')
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+        
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    }
+}
+```
+
+```groovy Scripted Pipeline
+node {
+    def sonarToken = credentials('sonarqube-token')
+    
+    stage('Checkout') {
+        checkout scm
+    }
+    
+    stage('Build') {
+        sh 'mvn clean package'
+    }
+    
+    stage('SonarQube Analysis') {
+        withSonarQubeEnv('SonarQube') {
+            sh 'mvn sonar:sonar'
+        }
+    }
+    
+    stage('Quality Gate') {
+        timeout(time: 5, unit: 'MINUTES') {
+            def qg = waitForQualityGate()
+            if (qg.status != 'OK') {
+                error "Pipeline aborted due to quality gate failure: ${qg.status}"
+            }
+        }
+    }
+}
+```
+
+```groovy Gradle Project
+pipeline {
+    agent any
+    
+    environment {
+        SONAR_TOKEN = credentials('sonarqube-token')
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Build and Analyze') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh './gradlew build sonar'
+                }
+            }
+        }
+        
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    }
+}
+```
+
+```groovy Node.js Project
+pipeline {
+    agent any
+    
+    environment {
+        SONAR_TOKEN = credentials('sonarqube-token')
+    }
+    
+    tools {
+        nodejs 'NodeJS 20'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm ci'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                sh 'npm test -- --coverage'
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'npx sonar-scanner'
+                }
+            }
+        }
+        
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    }
+}
+```
+
+```groovy .NET Project
+pipeline {
+    agent any
+    
+    environment {
+        SONAR_TOKEN = credentials('sonarqube-token')
+        SCANNER_HOME = tool 'SonarScanner for .NET'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Begin SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    bat "${SCANNER_HOME}\\SonarScanner.MSBuild.exe begin /k:\"my-project\""
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                bat 'dotnet build'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                bat 'dotnet test --collect:"Code Coverage"'
+            }
+        }
+        
+        stage('End SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    bat "${SCANNER_HOME}\\SonarScanner.MSBuild.exe end"
+                }
+            }
+        }
+        
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    }
+}
+```
+
+</CodeGroup>
+
+## Jenkins Configuration
+
+### Install Required Plugins
+
+1. **SonarQube Scanner** - Provides SonarQube integration
+2. **Pipeline** - For pipeline job support
+3. **Multibranch Pipeline** - For automatic branch/PR detection
+4. **GitHub Branch Source** / **GitLab** / **Bitbucket** - For SCM integration
+
+### Configure SonarQube Server
+
+1. Navigate to **Manage Jenkins > Configure System**
+2. Scroll to **SonarQube servers**
+3. Click **Add SonarQube**
+4. Configure:
+   - Name: `SonarQube` (used in `withSonarQubeEnv`)
+   - Server URL: Your SonarQube server URL
+   - Server authentication token: Add a secret text credential
+5. Save the configuration
+
+### Configure Scanner
+
+1. Navigate to **Manage Jenkins > Global Tool Configuration**
+2. Scroll to **SonarQube Scanner**
+3. Click **Add SonarQube Scanner**
+4. Configure:
+   - Name: `SonarQube Scanner`
+   - Install automatically: Checked
+   - Version: Select latest version
+
+### Store Credentials
+
+1. Navigate to **Manage Jenkins > Credentials**
+2. Select appropriate domain
+3. Click **Add Credentials**
+4. Configure:
+   - Kind: Secret text
+   - Secret: Your SonarQube token
+   - ID: `sonarqube-token`
+   - Description: SonarQube Authentication Token
+
+## Multibranch Pipeline Setup
+
+### Create Multibranch Pipeline
+
+1. Click **New Item**
+2. Enter a name
+3. Select **Multibranch Pipeline**
+4. Configure:
+   - **Branch Sources**: Add your SCM (GitHub, GitLab, Bitbucket)
+   - **Build Configuration**: By Jenkinsfile
+   - **Scan Multibranch Pipeline Triggers**: Enable periodic scanning
+5. Save
+
+### Jenkinsfile in Repository
+
+Create a `Jenkinsfile` in your repository root with the pipeline configuration.
+
+## Advanced Configuration
+
+### Conditional Analysis
+
+Run analysis only on specific branches:
+
+```groovy
+pipeline {
+    agent any
+    
+    stages {
+        stage('SonarQube Analysis') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    changeRequest()
+                }
+            }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+    }
+}
+```
+
+### Parallel Execution
+
+```groovy
+pipeline {
+    agent any
+    
+    stages {
+        stage('Build and Test') {
+            parallel {
+                stage('Build') {
+                    steps {
+                        sh 'mvn clean package'
+                    }
+                }
+                stage('Unit Tests') {
+                    steps {
+                        sh 'mvn test'
+                    }
+                }
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+    }
+}
+```
+
+### Skip Quality Gate
+
+For non-critical branches:
+
+```groovy
+stage('Quality Gate') {
+    when {
+        branch 'main'
+    }
+    steps {
+        timeout(time: 5, unit: 'MINUTES') {
+            waitForQualityGate abortPipeline: true
+        }
+    }
+}
+```
+
+## Manual Override
+
+If you need to override the auto-detected values:
+
+```groovy
+stage('SonarQube Analysis') {
+    steps {
+        withSonarQubeEnv('SonarQube') {
+            sh '''
+                mvn sonar:sonar \
+                  -Dsonar.pullrequest.key=${CHANGE_ID} \
+                  -Dsonar.pullrequest.branch=${CHANGE_BRANCH} \
+                  -Dsonar.pullrequest.base=${CHANGE_TARGET}
+            '''
+        }
+    }
+}
+```
+
+## Freestyle Jobs
+
+For freestyle jobs (not recommended), configure manually:
+
+1. Add build step: **Execute SonarQube Scanner**
+2. Configure analysis properties:
+   ```properties
+   sonar.projectKey=my-project
+   sonar.sources=src
+   sonar.branch.name=${GIT_BRANCH}
+   ```
+
+## Important Notes
+
+<Warning>
+**Environment Variables in Standard Jobs**
+
+`CHANGE_ID`, `CHANGE_BRANCH`, and `CHANGE_TARGET` are only available in Multibranch Pipeline jobs. Use Multibranch Pipelines for automatic PR detection.
+</Warning>
+
+<Info>
+**Webhook Configuration**
+
+Configure a webhook in SonarQube pointing to `http://your-jenkins/sonarqube-webhook/` for quality gate status updates.
+</Info>
+
+## Troubleshooting
+
+### PR Detection Not Working
+
+1. Verify you're using a Multibranch Pipeline job
+2. Check that your SCM plugin is properly configured
+3. Ensure PR discovery is enabled in branch source configuration
+
+### Debug Environment Variables
+
+```groovy
+stage('Debug') {
+    steps {
+        script {
+            echo "JENKINS_HOME: ${env.JENKINS_HOME}"
+            echo "BRANCH_NAME: ${env.BRANCH_NAME}"
+            echo "CHANGE_ID: ${env.CHANGE_ID}"
+            echo "CHANGE_BRANCH: ${env.CHANGE_BRANCH}"
+            echo "CHANGE_TARGET: ${env.CHANGE_TARGET}"
+        }
+    }
+}
+```
+
+### Quality Gate Timeout
+
+If `waitForQualityGate` times out:
+
+1. Verify webhook is configured in SonarQube
+2. Check webhook logs in SonarQube
+3. Ensure Jenkins is reachable from SonarQube
+4. Increase timeout value

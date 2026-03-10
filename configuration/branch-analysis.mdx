@@ -1,0 +1,62 @@
+---
+title: Branch Analysis
+description: Configure branch analysis for your SonarQube projects
+---
+
+## Overview
+
+Branch analysis allows you to track code quality across different branches in your repository. Before you can decorate pull requests, you need to analyze the target branch first.
+
+## Auto-Configuration
+
+If your scan is running from a CI system that supports auto-configuration, the scanner can be launched without any branch parameters. The plugin will automatically detect the branch information.
+
+Supported CI systems with auto-configuration:
+- GitHub Actions
+- GitLab CI
+- Azure DevOps
+- Bitbucket Pipelines
+- Jenkins
+- Cirrus CI
+- CodeMagic
+
+## Manual Configuration
+
+If your CI system doesn't support auto-configuration, you need to manually specify the branch being analyzed.
+
+<ParamField path="sonar.branch.name" type="string" required>
+  The name of the branch being analyzed.
+  
+  This parameter tells SonarQube which branch the analysis belongs to. Each branch maintains its own quality gate status and issue tracking.
+  
+  **Examples:**
+  - `master`
+  - `main`
+  - `develop`
+  - `feature/TICKET-123`
+</ParamField>
+
+## Example Configuration
+
+### Command Line
+
+```bash
+sonar-scanner \
+  -Dsonar.projectKey=my-project \
+  -Dsonar.sources=. \
+  -Dsonar.host.url=https://sonarqube.example.com \
+  -Dsonar.token=your-token \
+  -Dsonar.branch.name=develop
+```
+
+### sonar-project.properties
+
+```properties
+sonar.projectKey=my-project
+sonar.sources=.
+sonar.branch.name=develop
+```
+
+<Warning>
+  Do not set any `sonar.branch` properties (like `sonar.branch.name`) when analyzing a pull request. Branch properties indicate that a branch is being analyzed rather than a pull request, so no pull request decoration will be executed.
+</Warning>

@@ -1,0 +1,312 @@
+---
+title: Common Issues
+description: Common problems and solutions for the SonarQube Community Branch Plugin
+---
+
+This page covers the most common issues encountered when using the SonarQube Community Branch Plugin and how to resolve them.
+
+## Java Agent Not Loading
+
+### Symptoms
+
+- Branches or pull requests are not showing in the SonarQube UI
+- Logs show no indication of the plugin being loaded
+- Branch analysis parameters are rejected with errors
+
+### Causes and Solutions
+
+#### Missing or Incorrect javaagent Configuration
+
+<Warning>
+The plugin requires Java agent configuration for **both** the web server and compute engine. Missing either will cause the plugin to fail.
+</Warning>
+
+Verify that your `conf/sonar.properties` file contains:
+
+```properties
+sonar.web.javaAdditionalOpts=-javaagent:./extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=web
+sonar.ce.javaAdditionalOpts=-javaagent:./extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=ce
+```
+
+Replace `${version}` with your actual plugin version (e.g., `25.4.0`).
+
+**Common mistakes:**
+- Using wrong version number in the path
+- Missing the `=web` or `=ce` argument at the end
+- Incorrect path to the JAR file
+- Forgetting to configure both web and CE agents
+
+#### Plugin JAR Not in Extensions Directory
+
+Ensure the plugin JAR file is located at:
+```
+$SONARQUBE_HOME/extensions/plugins/sonarqube-community-branch-plugin-${version}.jar
+```
+
+#### Existing javaAdditionalOpts Configuration
+
+If you already have `sonar.web.javaAdditionalOpts` or `sonar.ce.javaAdditionalOpts` configured, **append** the javaagent configuration rather than replacing it:
+
+```properties
+sonar.web.javaAdditionalOpts=-Xmx512m -javaagent:./extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=web
+```
+
+#### Docker Environment Variables
+
+<Warning>
+When using Docker and setting `SONAR_WEB_JAVAADDITIONALOPTS` or `SONAR_CE_JAVAADDITIONALOPTS` environment variables, you must include the complete javaagent configuration in your overrides.
+</Warning>
+
+Example Docker Compose:
+```yaml
+environment:
+  SONAR_WEB_JAVAADDITIONALOPTS: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=web"
+  SONAR_CE_JAVAADDITIONALOPTS: "-javaagent:/opt/sonarqube/extensions/plugins/sonarqube-community-branch-plugin-${version}.jar=ce"
+```
+
+## Web UI Not Showing Branches
+
+### Symptoms
+
+- Plugin appears to be loaded (check logs)
+- Analysis completes successfully
+- Branch/PR data is in the database
+- UI does not display branches or pull requests
+
+### Solution
+
+#### Missing or Incorrect Web Assets
+
+The plugin requires **both** the JAR file and modified web assets.
+
+1. Download the `sonarqube-webapp.zip` file from the same release as your plugin JAR
+2. Extract the contents to replace the `web` directory in your SonarQube installation:
+   ```bash
+   cd $SONARQUBE_HOME
+   rm -rf web/*
+   unzip -o sonarqube-webapp.zip -d web/
+   ```
+
+3. Restart SonarQube
+
+<Warning>
+For Kubernetes deployments, ensure the webapp files are loaded via an init container as shown in the Helm chart example in the installation documentation.
+</Warning>
+
+#### Browser Cache
+
+Clear your browser cache and hard refresh (Ctrl+Shift+R or Cmd+Shift+R) after replacing web assets.
+
+## Pull Request Decoration Not Working
+
+### Symptoms
+
+- Analysis completes successfully
+- No comments or status checks appear on the pull request
+- Logs show "No decorator found for this Pull Request"
+
+### Causes and Solutions
+
+#### Missing ALM Configuration
+
+The plugin requires ALM (Application Lifecycle Management) configuration to decorate pull requests.
+
+1. Configure the ALM integration in SonarQube:
+   - Go to Administration > Configuration > General > ALM Integrations
+   - Add your GitHub, GitLab, Bitbucket, or Azure DevOps configuration
+
+2. Bind your project to the ALM:
+   - Go to Project Settings > General Settings > DevOps Platform Integration
+   - Select your ALM and configure the repository binding
+
+#### Missing Target Branch Analysis
+
+<Warning>
+You **must** analyze the target branch (e.g., `main` or `master`) before analyzing pull requests. Pull request analysis compares against the target branch.
+</Warning>
+
+First, analyze your main branch:
+```bash
+sonar-scanner -Dsonar.branch.name=main
+```
+
+Then analyze the pull request:
+```bash
+sonar-scanner \
+  -Dsonar.pullrequest.key=123 \
+  -Dsonar.pullrequest.branch=feature-branch \
+  -Dsonar.pullrequest.base=main
+```
+
+#### Conflicting Branch Parameters
+
+<Warning>
+Do **not** set `sonar.branch.name` when analyzing a pull request. This tells SonarQube to analyze a branch instead of a pull request.
+</Warning>
+
+Incorrect:
+```bash
+# DON'T DO THIS
+sonar-scanner \
+  -Dsonar.branch.name=feature-branch \
+  -Dsonar.pullrequest.key=123
+```
+
+Correct:
+```bash
+sonar-scanner \
+  -Dsonar.pullrequest.key=123 \
+  -Dsonar.pullrequest.branch=feature-branch \
+  -Dsonar.pullrequest.base=main
+```
+
+#### Missing SCM Revision for GitHub
+
+When analyzing GitHub pull requests, you must set `sonar.scm.revision`:
+
+```yaml
+- name: SonarQube Scan
+  uses: sonarsource/sonarqube-scan-action@<version>
+  with:
+    args: >
+      -Dsonar.scm.revision=${{ github.event.pull_request.head.sha }}
+```
+
+#### No Commit in Git Repository
+
+Ensure your code is committed to Git before running analysis. The plugin requires commit information to decorate pull requests.
+
+#### Images Not Loading in PR Comments
+
+If your SonarQube server is behind a firewall and the PR service cannot access it:
+
+1. Go to Administration > Configuration > General > Pull Request
+2. Set "Images base URL" to:
+   ```
+   https://raw.githubusercontent.com/mc1arke/sonarqube-community-branch-plugin/master/src/main/resources/static
+   ```
+
+Or host the images yourself and provide that URL.
+
+## Version Mismatches
+
+### Symptoms
+
+- Plugin fails to load
+- ClassNotFoundException or NoSuchMethodError in logs
+- SonarQube fails to start
+- Incompatibility warnings
+
+### Solution
+
+<Warning>
+The plugin major and minor versions **must** match your SonarQube version exactly.
+</Warning>
+
+**Version matching rules:**
+- Plugin `25.4.0` → SonarQube `25.4.x` (any patch version)
+- Plugin `25.3.0` → SonarQube `25.3.x`
+- Plugin `10.8.0` → SonarQube `10.8.x`
+
+**Do not mix versions:**
+- ❌ Plugin `25.4.0` with SonarQube `25.3.0`
+- ❌ Plugin `10.8.0` with SonarQube `11.0.0`
+- ✅ Plugin `25.4.0` with SonarQube `25.4.0`
+- ✅ Plugin `25.4.0` with SonarQube `25.4.1`
+
+To check your versions:
+```bash
+# Check SonarQube version
+curl http://localhost:9000/api/system/status | jq .version
+
+# Check plugin JAR filename
+ls -l $SONARQUBE_HOME/extensions/plugins/sonarqube-community-branch-plugin-*.jar
+```
+
+## Server Base URL Not Configured
+
+### Symptoms
+
+- Pull request comments contain broken links
+- Links in PR comments return 404 errors
+
+### Solution
+
+Configure the server base URL:
+
+1. Go to Administration > Configuration > General > Server base URL
+2. Set it to your SonarQube server URL (e.g., `https://sonarqube.example.com`)
+3. Ensure the URL is accessible from your ALM (GitHub, GitLab, etc.)
+
+## Scanner Auto-Configuration Issues
+
+### Symptoms
+
+- CI environment variables are set correctly
+- Analysis parameters are not auto-detected
+- Manual parameters required even though CI should auto-configure
+
+### Supported CI Systems
+
+The plugin automatically configures branch analysis for:
+- Azure DevOps
+- Bitbucket Pipelines
+- Cirrus CI
+- CodeMagic
+- GitHub Actions
+- GitLab CI
+- Jenkins
+
+If auto-configuration doesn't work, manually specify the parameters as shown in the [Pull Request Decoration](#pull-request-decoration-not-working) section.
+
+## Permission and Access Issues
+
+### Symptoms
+
+- API authentication failures in logs
+- "403 Forbidden" or "401 Unauthorized" errors
+- Pull requests analyzed but not decorated
+
+### Solution
+
+Verify your ALM credentials:
+
+1. **GitHub**: Ensure your token has the following permissions:
+   - `repo` scope for private repositories
+   - `public_repo` scope for public repositories
+   - `write:discussion` for PR comments
+
+2. **GitLab**: Token needs:
+   - `api` scope
+   - `write_repository` access
+
+3. **Bitbucket**: App password needs:
+   - Pull requests: Read and Write
+   - Repositories: Read
+
+4. **Azure DevOps**: Personal Access Token needs:
+   - Code: Read & Write
+   - Pull Request Threads: Read & Write
+
+Test the credentials using the validation feature:
+- Go to Project Settings > General Settings > DevOps Platform Integration
+- Click "Validate" after configuring your ALM binding
+
+## Third-Party Plugin Warning
+
+### Symptoms
+
+SonarQube displays a warning about using third-party plugins on startup.
+
+### Solution
+
+This is expected behavior. The warning appears because this is a community plugin, not an official SonarSource plugin. 
+
+**You must accept this warning to use the plugin.**
+
+The warning reminds you that:
+- This plugin is not maintained by SonarSource
+- No official support is available from SonarSource
+- Migrating to commercial editions may result in data loss
+
+See the [Support Limitations](/introduction#support-and-limitations) for more information.

@@ -1,0 +1,290 @@
+---
+title: Docker Compose Installation
+description: Deploy SonarQube with PostgreSQL using Docker Compose
+---
+
+Docker Compose provides a complete SonarQube setup with a PostgreSQL database, perfect for development and testing.
+
+## Overview
+
+The provided `docker-compose.yml` file configures:
+- SonarQube with the Community Branch Plugin
+- PostgreSQL 16 database
+- Persistent volumes for data
+- Network connectivity between services
+
+## Prerequisites
+
+- Docker Compose installed on your system
+- Docker Compose added to your PATH
+- Available ports: 9000 (SonarQube)
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/mc1arke/sonarqube-community-branch-plugin.git
+    cd sonarqube-community-branch-plugin
+    ```
+  </Step>
+
+  <Step title="Create environment file">
+    Create a `.env` file in the project root with the `SONARQUBE_VERSION` variable:
+    
+    ```bash .env
+    SONARQUBE_VERSION=25.4
+    PLUGIN_VERSION=25.4.0
+    DOCKERFILE=Dockerfile
+    ```
+  </Step>
+
+  <Step title="Start the services">
+    ```bash
+    docker compose up
+    ```
+    
+    Add `-d` flag to run in detached mode:
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+
+  <Step title="Access SonarQube">
+    Once services are running, access SonarQube at `http://localhost:9000`
+    
+    Default credentials:
+    - Username: `admin`
+    - Password: `admin`
+  </Step>
+</Steps>
+
+## Docker Compose Configuration
+
+The `docker-compose.yml` file defines the complete stack:
+
+```yaml
+services:
+  sonarqube:
+    depends_on:
+      db:
+        condition: service_healthy
+    image: mc1arke/sonarqube-with-community-branch-plugin:${SONARQUBE_VERSION}
+    build:
+      context: .
+      dockerfile: ${DOCKERFILE}
+      args:
+        SONARQUBE_VERSION: ${SONARQUBE_VERSION}
+        PLUGIN_VERSION: ${PLUGIN_VERSION}
+    container_name: sonarqube
+    ports:
+      - "9000:9000"
+    networks:
+      - sonarnet
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://db:5432/sonar
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=sonar
+    volumes:
+      - sonarqube_conf:/opt/sonarqube/conf
+      - sonarqube_data:/opt/sonarqube/data
+
+  db:
+    image: postgres:16
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    hostname: db
+    container_name: postgres
+    networks:
+      - sonarnet
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonar
+    volumes:
+      - postgresql:/var/lib/postgresql
+      - postgresql_data:/var/lib/postgresql/data
+
+volumes:
+  sonarqube_conf:
+  sonarqube_data:
+  postgresql:
+  postgresql_data:
+
+networks:
+  sonarnet:
+```
+
+## Environment Variables
+
+Configure the deployment using the `.env` file:
+
+<ParamField path="SONARQUBE_VERSION" type="string" required>
+  The SonarQube version to use (e.g., `25.4`, `25.3`)
+</ParamField>
+
+<ParamField path="PLUGIN_VERSION" type="string">
+  The plugin version to build with (e.g., `25.4.0`)
+</ParamField>
+
+<ParamField path="DOCKERFILE" type="string">
+  Path to the Dockerfile (default: `Dockerfile`)
+</ParamField>
+
+## Managing the Stack
+
+### Start services
+
+```bash
+docker compose up
+```
+
+### Start in background
+
+```bash
+docker compose up -d
+```
+
+### Stop services
+
+```bash
+docker compose down
+```
+
+### Stop and remove volumes
+
+<Warning>
+  This will delete all SonarQube data including projects and configurations
+</Warning>
+
+```bash
+docker compose down -v
+```
+
+### View logs
+
+```bash
+# All services
+docker compose logs -f
+
+# SonarQube only
+docker compose logs -f sonarqube
+
+# Database only
+docker compose logs -f db
+```
+
+### Rebuild and start
+
+```bash
+docker compose up --build
+```
+
+## Database Configuration
+
+The stack uses PostgreSQL 16 with:
+
+- **Database name**: `sonar`
+- **Username**: `sonar`
+- **Password**: `sonar`
+- **Health check**: Ensures database is ready before SonarQube starts
+
+<Note>
+  In production, change the default database credentials in both the `.env` file and the `docker-compose.yml` configuration.
+</Note>
+
+## Persistent Storage
+
+Data is persisted in Docker volumes:
+
+- `sonarqube_conf` - SonarQube configuration files
+- `sonarqube_data` - SonarQube data (projects, issues, etc.)
+- `postgresql` - PostgreSQL system files
+- `postgresql_data` - PostgreSQL data files
+
+## Networking
+
+Services communicate over the `sonarnet` bridge network:
+
+- SonarQube container connects to database using hostname `db`
+- Port 9000 is exposed on the host for web access
+- Database port (5432) is only accessible within the Docker network
+
+## Building from Source
+
+The Docker Compose configuration can build the plugin from source:
+
+```bash
+docker compose up --build
+```
+
+This will:
+1. Build the plugin using Gradle
+2. Build the modified web application using Node.js
+3. Create the Docker image with both components
+4. Start the services
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Services won't start">
+    Check the logs:
+    ```bash
+    docker compose logs
+    ```
+    
+    Common issues:
+    - Port 9000 already in use
+    - Insufficient Docker memory allocation
+    - Missing `.env` file
+  </Accordion>
+
+  <Accordion title="Database connection errors">
+    The database health check ensures PostgreSQL is ready before SonarQube starts. If you see connection errors:
+    
+    - Wait for the database to complete initialization
+    - Check database logs: `docker compose logs db`
+    - Verify network connectivity: `docker network inspect sonarqube-community-branch-plugin_sonarnet`
+  </Accordion>
+
+  <Accordion title="SonarQube stuck on startup">
+    SonarQube can take 1-2 minutes to start:
+    
+    - Monitor progress: `docker compose logs -f sonarqube`
+    - Look for "SonarQube is operational" message
+    - Check available memory (requires at least 2GB)
+  </Accordion>
+
+  <Accordion title="Cannot access on port 9000">
+    - Verify services are running: `docker compose ps`
+    - Check port mapping: `docker compose port sonarqube 9000`
+    - Try accessing `http://127.0.0.1:9000` instead of `localhost`
+  </Accordion>
+</AccordionGroup>
+
+## Production Considerations
+
+<Warning>
+  The default configuration is intended for development. For production deployments:
+</Warning>
+
+- Change default database credentials
+- Use named volumes or host mounts for backups
+- Configure resource limits
+- Set up SSL/TLS termination
+- Use external database for scalability
+- Implement monitoring and alerting
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Kubernetes Setup" icon="dharmachakra" href="/installation/kubernetes">
+    Deploy to production with Kubernetes
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/global-settings">
+    Configure branch analysis and PR decoration
+  </Card>
+</CardGroup>
